@@ -1,0 +1,41 @@
+# Visual Studio
+.vs/
+*.vsidx
+
+# Node.js
+node_modules/
+npm-debug.log
+dist/
+
+# Configuration & Secrets
+config.json
+appsettings.json
+.env
+*.local.json
+
+# Databases & Storage
+services/api/storage/asset/*
+!services/api/storage/asset/.gitkeep
+services/api/storage/thumbnails/*
+!services/api/storage/thumbnails/.gitkeep
+
+# .NET
+bin/
+obj/
+*.csproj.user
+
+# RCC & Binaries
+services/RCCService/
+services/RCCService.exe
+services/RCCService.exe.bak
+*.exe
+*.dll
+*.pdb
+
+# System & Temp Files
+.DS_Store
+Thumbs.db
+tmp_place_file.rbxl
+tmp_place_file_out.rbxl
+rcccid-*
+TeeShirtTemplate.png
