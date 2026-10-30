@@ -6,11 +6,11 @@
 }
 <partial name="_SignupStyles" />
 
-<div class="auths-wrap auths-wrap-login">
+<div class="auths-wrap auths-wrap--login">
     <partial name="_BloxynLogo" model='"bloxyn-logo-hero"' />
 
     <div class="auths-card">
-        <h1 class="auths-title">Log In</h1>
+        <h1 class="auths-title">Log in to Bloxyn</h1>
 
         @if (string.IsNullOrEmpty(Model.applicationId))
         {
@@ -27,7 +27,7 @@
         <form method="post">
             <div class="auths-field">
                 <label class="auths-label" for="login-username">Username</label>
-                <input id="login-username" disabled="@Model.loginDisabled" type="text" placeholder="Username" name="username" value="@Model.username" class="auths-input" autocomplete="username" />
+                <input id="login-username" disabled="@Model.loginDisabled" type="text" placeholder="Username" name="username" class="auths-input" autocomplete="username" />
             </div>
 
             <div class="auths-field">
@@ -45,31 +45,23 @@
                 <p class="auths-forgot"><a href="/auth/password-reset">Forgot username or password?</a></p>
             }
 
-            @if (!string.IsNullOrWhiteSpace(Model.siteKey))
-            {
-                <div class="h-captcha mt-3 mb-3" data-sitekey="@Model.siteKey" data-theme="light"></div>
-            }
+            <div class="h-captcha mt-3 mb-3" data-sitekey="@Model.siteKey" data-theme="light"></div>
 
             @Html.AntiForgeryToken()
             <button disabled="@Model.loginDisabled" class="auths-submit" type="submit" id="login-submit">Log In</button>
         </form>
     </div>
 
-    @if (Model.applicationId != null)
-    {
-        <p class="auths-switch">
-            Don't have an account? <a href="/auth/signup?applicationId=@Model.applicationId">Create one here</a>.
-        </p>
-    }
-    else
-    {
-        <p class="auths-switch">
-            Don't have an account? <a href="/auth/application">Create one here</a>.
-        </p>
-    }
+    <p class="auths-switch">
+        @if (Model.applicationId != null)
+        {
+            <span>Don't have an account? <a href="/auth/signup?applicationId=@Model.applicationId">Create one here</a>.</span>
+        }
+        else
+        {
+            <span>Don't have an account? <a href="/auth/application">Create one here</a>.</span>
+        }
+    </p>
 </div>
 
-@if (!string.IsNullOrWhiteSpace(Model.siteKey))
-{
-    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
-}
+<script src="https://js.hcaptcha.com/1/api.js" async defer></script>
