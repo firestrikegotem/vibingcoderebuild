@@ -47,7 +47,7 @@ const useStyles = createUseStyles({
 
 const LinkEntry = props => {
   const s = useStyles();
-  return <div className='col-3'>
+  return <div className='col'>
     <Link href={`/${props.url}`}>
       <a className={`${s.linkEntry} nav-link active pt-0`}>
         {props.children}
@@ -65,6 +65,7 @@ const NavigationLinks = props => {
         <LinkEntry url='catalog'>Catalog</LinkEntry>
         <LinkEntry url='develop'>Develop</LinkEntry>
         <LinkEntry url='robux.aspx'>ROBUX</LinkEntry>
+        <LinkEntry url='download'>Download</LinkEntry>
       </div>
     </div>
   </div>
