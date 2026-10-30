@@ -247,6 +247,40 @@ public class AssetsService : ServiceBase, IService
     }
 
     /// <summary>
+    /// Same as ValidateAssetFile, except it returns null when the validation service could not be
+    /// reached, so callers can fall back to their own checks instead of rejecting every upload.
+    /// </summary>
+    public async Task<bool?> ValidateAssetFileOrNull(Stream file, Models.Assets.Type assetType)
+    {
+        Writer.Info(LogGroup.AssetValidation, "validating asset (nullable). type = {0}", assetType);
+        try
+        {
+            var s = new StreamContent(file);
+            s.Headers.Add("robloxAuthorization", Configuration.AssetValidationServiceAuthorization);
+            var url = Configuration.AssetValidationServiceUrl + "/api/v1/validate-item";
+            if (assetType == Type.Place)
+            {
+                url = Configuration.AssetValidationServiceUrl + "/api/v1/validate-place";
+            }
+
+            var ok = await assetValidationClient.PostAsync(url, s);
+            if (!ok.IsSuccessStatusCode)
+            {
+                Writer.Info(LogGroup.AssetValidation, "asset validation service returned {0}", ok.StatusCode);
+                return null;
+            }
+
+            var result = JsonSerializer.Deserialize<AssetValidationResponse>(await ok.Content.ReadAsStringAsync());
+            return result is {isValid: true};
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetValidation, "asset validation service unreachable. message = {0}", e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Asks the asset validation service whether a place file is a real place (.rbxl) file.
     /// Returns true when the file is valid, false when the service rejected it, and null when
     /// the service could not be reached so the caller can decide what to do next.

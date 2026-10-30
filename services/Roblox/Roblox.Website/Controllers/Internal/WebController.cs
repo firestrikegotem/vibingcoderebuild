@@ -295,7 +295,29 @@ public class WebController : ControllerBase
         };
     }
 
-    private static readonly List<Models.Assets.Type> AllowedAssetTypes = new() { Models.Assets.Type.Audio, Models.Assets.Type.TeeShirt, Models.Assets.Type.Shirt, Models.Assets.Type.Pants, Models.Assets.Type.Image };
+    private static readonly Models.Assets.Type[] AccessoryTypes =
+    {
+        Models.Assets.Type.Hat,
+        Models.Assets.Type.HairAccessory,
+        Models.Assets.Type.FaceAccessory,
+        Models.Assets.Type.NeckAccessory,
+        Models.Assets.Type.ShoulderAccessory,
+        Models.Assets.Type.FrontAccessory,
+        Models.Assets.Type.BackAccessory,
+        Models.Assets.Type.WaistAccessory,
+        Models.Assets.Type.Face,
+    };
+
+    /// <summary>
+    /// Types a regular player may create through Develop. Accessories (hats, hair, faces and every
+    /// accessory slot) are intentionally absent: those are .rbxm models and staff-only, created from
+    /// the admin panel so catalog content stays curated.
+    /// </summary>
+    private static readonly List<Models.Assets.Type> AllowedAssetTypes = new List<Models.Assets.Type>
+    {
+        Models.Assets.Type.Audio, Models.Assets.Type.TeeShirt, Models.Assets.Type.Shirt, Models.Assets.Type.Pants,
+        Models.Assets.Type.Image,
+    };
     private static int pendingAssetUploads { get; set; } = 0;
     private static readonly Mutex pendingAssetUploadsMux = new();
 
@@ -333,12 +355,33 @@ public class WebController : ControllerBase
         return null;
     }
 
+    /// <summary>
+    /// A Roblox model is either the binary format (starts with "&lt;roblox!") or the XML one (starts
+    /// with "&lt;roblox"). Used only when the validation service cannot be reached.
+    /// </summary>
+    private static bool LooksLikeModelFile(byte[] fileBytes)
+    {
+        if (fileBytes.Length < 8) return false;
+        var head = System.Text.Encoding.ASCII.GetString(fileBytes, 0, 8);
+        return head.StartsWith("<roblox!", StringComparison.Ordinal) ||
+               head.StartsWith("<roblox ", StringComparison.Ordinal) ||
+               head.StartsWith("<roblox?", StringComparison.Ordinal);
+    }
+
     [HttpPost("develop/upload")]
     public async Task<CreateResponse> UploadItem([Required, FromForm] UploadAssetRequest request)
     {
         FeatureFlags.FeatureCheck(FeatureFlag.UploadContentEnabled);
-        if (!AllowedAssetTypes.Contains(request.assetType) || userSession == null) throw new BadRequestException();
-        
+        if (userSession == null) throw new BadRequestException();
+
+        // Hats, hair, faces and every accessory slot are staff-only. They are model (.rbxm) uploads and
+        // are created from the admin panel, so tell players that plainly instead of a generic bad request.
+        if (AccessoryTypes.Contains(request.assetType))
+            throw new RobloxException(403, 0,
+                "Hats, hair, faces and accessories can only be created by Bloxyn staff.");
+
+        if (!AllowedAssetTypes.Contains(request.assetType)) throw new BadRequestException();
+
         var isClothing = request.assetType is Models.Assets.Type.Shirt or Models.Assets.Type.Pants or Models.Assets.Type.TeeShirt;
         var isAudio = request.assetType is Models.Assets.Type.Audio;
         var isImage = request.assetType is Models.Assets.Type.Image;
@@ -376,17 +419,14 @@ public class WebController : ControllerBase
                 stream.Position = 0;
                 string imageHash = await services.assets.GenerateImageHash(stream);
 
-                // 2. Hardcoded asset directory. Clothing uploads must land in the same folder the website
-                //    serves /asset/?id= from, otherwise RCC fails with "Temp read failed".
-                string assetDir = @"C:\Users\losin\Desktop\ecsrev-main\services\api\storage\asset";
+                // 2. Clothing uploads have to land in the folder the website serves /asset/?id= from,
+                //    which is Directories:Asset. Anything else and RCC fails with "Temp read failed".
+                var assetDir = (Roblox.Configuration.AssetDirectory ?? "").TrimEnd('\\', '/');
+                if (string.IsNullOrWhiteSpace(assetDir))
+                    throw new RobloxException(500, 0, "The asset directory is not configured. Set Directories:Asset in appsettings.json.");
 
                 if (!System.IO.Directory.Exists(assetDir))
                     System.IO.Directory.CreateDirectory(assetDir);
-
-                var configuredAssetDir = (Roblox.Configuration.AssetDirectory ?? "").TrimEnd('\\', '/');
-                if (!configuredAssetDir.Equals(assetDir.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
-                    Console.WriteLine($"[warning] Directories:Asset is \"{Roblox.Configuration.AssetDirectory}\" but this upload writes to \"{assetDir}\". " +
-                                      "Point Directories:Asset at the same path or the renderer will not be able to read the file.");
 
                 // 3. Save the physical image. The filename is the SHA256 of the bytes, which is the same
                 //    key UploadAssetContent() uses, so the site can serve it with no extra work.
@@ -440,6 +480,11 @@ public class WebController : ControllerBase
                 }
 
                 await services.users.CreateUserAsset(userSession.userId, asset.assetId);
+
+                // The catalog only lists items that are for sale, so put uploads on the market for free.
+                await services.assets.SetItemPrice(asset.assetId, 0, null);
+                await services.assets.UpdateAssetMarketInfo(asset.assetId, true, false, false, null, null);
+
                 return asset;
             }
             else if (isImage)

@@ -3,6 +3,8 @@ import Ads from "./components/subPages/ads";
 import Clothing from "./components/subPages/clothing";
 import GamesSubPage from "./components/subPages/games";
 
+// Hats, hair, faces and every accessory slot are staff-only .rbxm uploads and are created from
+// the admin panel, so they are intentionally missing from this player-facing list.
 const developerPages = [
   {
     id: 0,
@@ -71,9 +73,9 @@ const developerPages = [
     element: props => <Ads {...props}/>,
   },
   {
-    id: 102,
+    id: 103,
     name: 'Sponsored Games',
-    url: '/develop?View=102',
+    url: '/develop?View=103',
     disabled: true,
   },
   {

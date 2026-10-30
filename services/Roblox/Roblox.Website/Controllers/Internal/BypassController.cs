@@ -90,9 +90,15 @@ namespace Roblox.Website.Controllers
 
         private bool IsRcc()
         {
+            // Fail closed: if the configured key is missing the comparison below would be null == null,
+            // which would treat every anonymous request as the game server and disable asset encryption.
+            var expected = Configuration.RccAuthorization;
+            if (string.IsNullOrWhiteSpace(expected)) return false;
+
             var rccAccessKey = Request.Headers.ContainsKey("accessKey") ? Request.Headers["accessKey"].ToString() : null;
-            var isRcc = rccAccessKey == Configuration.RccAuthorization;
-            return isRcc;
+            if (string.IsNullOrWhiteSpace(rccAccessKey)) return false;
+
+            return rccAccessKey == expected;
         }
 
         [HttpGet("asset")]

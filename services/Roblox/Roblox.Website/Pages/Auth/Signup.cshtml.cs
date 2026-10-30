@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Roblox.AbuseDetection.Report;
 using Roblox.Dto.Users;
 using Roblox.Exceptions;
+using Roblox.Libraries.Discord;
 using Roblox.Logging;
 using Roblox.Models.Sessions;
 using Roblox.Models.Users;
@@ -43,6 +44,25 @@ public class Signup : RobloxPageModel
     public string? inviterUsername { get; set; }
     public string? errorMessage { get; set; }
     public bool signupDisabled { get; set; }
+    // Discord gate: a player must prove they are in the Bloxyn Discord server before signing up.
+    public DiscordVerification? discordVerification { get; set; }
+    public bool discordRequired { get; set; }
+    public string discordInviteUrl => DiscordApi.inviteUrl;
+    public string discordOAuthUrl =>
+        "/auth/discord/oauth?returnUrl=" + Uri.EscapeDataString(Request.Path + Request.QueryString);
+
+    /// <summary>
+    /// Reads the signed Discord verification cookie. The gate is skipped when Discord is not
+    /// configured so a missing client secret can never lock everyone out of signup.
+    /// </summary>
+    private void LoadDiscordState()
+    {
+        discordVerification = DiscordApi.ReadVerificationToken(Request.Cookies[DiscordApi.VerificationCookieName]);
+        var gateConfigured = DiscordApi.IsConfigured;
+        discordRequired = Roblox.Configuration.DiscordSignupGateEnabled && gateConfigured && discordVerification == null;
+        if (Roblox.Configuration.DiscordSignupGateEnabled && !gateConfigured)
+            Writer.Info(LogGroup.SignUp, "Discord signup gate is enabled but Discord is not configured - allowing signup");
+    }
 
     private void FeatureCheck()
     {
@@ -90,6 +110,7 @@ public class Signup : RobloxPageModel
         }
 
         await SetupInvite();
+        LoadDiscordState();
 
         return new PageResult();
     }
@@ -114,8 +135,30 @@ public class Signup : RobloxPageModel
         }
 
         await SetupInvite();
+        LoadDiscordState();
 
         FeatureFlags.FeatureCheck(FeatureFlag.SignupEnabled);
+
+        if (discordRequired)
+        {
+            Writer.Info(LogGroup.SignUp, "Sign up failed, player has not linked a Discord account");
+            errorMessage = "You must join the Bloxyn Discord server and link your Discord account before you can sign up.";
+            return new PageResult();
+        }
+
+        if (discordVerification != null)
+        {
+            var existingDiscordAccount = await services.users.GetDiscordAccountByDiscordId(
+                discordVerification.discordId.ToString());
+            if (existingDiscordAccount != null)
+            {
+                Writer.Info(LogGroup.SignUp, "Sign up failed, discord account already used. userId={0}",
+                    existingDiscordAccount.userId);
+                errorMessage = "That Discord account is already linked to another account.";
+                discordRequired = true;
+                return new PageResult();
+            }
+        }
         var ip = ControllerBase.GetIP(ControllerBase.GetRequesterIpRaw(HttpContext));
 
         // Initial cooldown check - to prevent people spamming attempts
@@ -305,6 +348,22 @@ public class Signup : RobloxPageModel
             sessionId = sess,
             createdAt = DateTimeOffset.Now.ToUnixTimeSeconds(),
         });
+        // Keep the Discord link on the new account, then clear the one-shot verification cookie.
+        if (discordVerification != null)
+        {
+            try
+            {
+                await services.users.LinkDiscordAccount(createdUser.userId,
+                    discordVerification.discordId.ToString(), discordVerification.username, true);
+            }
+            catch (DiscordAlreadyLinkedException)
+            {
+                Writer.Info(LogGroup.SignUp, "Discord link race for userId={0}", createdUser.userId);
+            }
+
+            HttpContext.Response.Cookies.Delete(DiscordApi.VerificationCookieName, new CookieOptions { Path = "/" });
+        }
+
         HttpContext.Response.Cookies.Append(Middleware.SessionMiddleware.CookieName, sessionCookie, new CookieOptions()
         {
             Secure = true,

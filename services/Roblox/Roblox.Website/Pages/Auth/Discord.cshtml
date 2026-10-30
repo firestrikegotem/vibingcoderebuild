@@ -3,19 +3,78 @@
 
 @{
     Layout = "Shared/_Layout";
+    var error = Request.Query["error"].ToString();
+    var errorText = error switch
+    {
+        "not_member" => "You are not in the Bloxyn Discord server yet. Join it first, then connect again.",
+        "denied" => "You cancelled the Discord connection.",
+        "state" => "That Discord link expired. Please try connecting again.",
+        "token" => "Discord did not accept the connection. Please try again.",
+        "credentials" => "Discord rejected this site's client secret, so linking cannot work yet. Please tell staff.",
+        "user" => "We could not read your Discord account. Please try again.",
+        "already_linked" => "That Discord account is already linked to another account.",
+        "not_configured" => "Discord linking is not set up on this site yet. Please contact staff.",
+        _ => ""
+    };
 }
 
 @section MetaTags {
-    <title>Discord Server</title>
+    <title>Discord</title>
 }
 
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-12 col-md-6 offset-md-3">
-            <div class="card card-body">
-                <h3>Discord</h3>
-                <p><a href="https://discord.gg/aCMvJctUPu">You may join our discord server here.</a>.</p>
+<partial name="_SignupStyles" />
+
+<div class="auths-wrap">
+    <partial name="_BloxynLogo" model='"bloxyn-logo-hero"' />
+
+    <div class="auths-card">
+        <h1 class="auths-title">Bloxyn Discord</h1>
+
+        @if (!string.IsNullOrEmpty(errorText))
+        {
+            <p class="auths-error">@errorText</p>
+        }
+        @if (Request.Query["linked"].ToString() == "1")
+        {
+            <p class="auths-note">Your Discord account is now linked.</p>
+        }
+        @if (Request.Query["unlinked"].ToString() == "1")
+        {
+            <p class="auths-note">Your Discord account has been unlinked.</p>
+        }
+
+        @if (Model.discordAccount != null)
+        {
+            <div class="auths-discord auths-discord--ok">
+                <span class="auths-discord-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5"></path>
+                    </svg>
+                </span>
+                <span>Linked as <strong>@Model.discordAccount.discordUsername</strong></span>
             </div>
-        </div>
+            <p class="auths-note">
+                Your site account is connected to Discord. You can remove the link at any time.
+            </p>
+            <form method="post" action="/auth/discord/unlink">
+                @Html.AntiForgeryToken()
+                <button class="auths-discord-btn" type="submit">Unlink Discord</button>
+            </form>
+        }
+        else
+        {
+            <p class="auths-note">
+                Bloxyn lives on Discord. You need to be a member of our server before you can create an account,
+                so join it and then connect your Discord below.
+            </p>
+            <div class="auths-discord-actions">
+                <a class="auths-discord-btn" href="@Model.inviteUrl" target="_blank" rel="noopener noreferrer">Join the server</a>
+                <a class="auths-discord-btn auths-discord-btn--primary" href="/auth/discord/oauth?returnUrl=%2Fauth%2Fdiscord">Connect Discord</a>
+            </div>
+        }
+
+        <p class="auths-switch">
+            <a href="/auth/signup">Back to sign up</a>
+        </p>
     </div>
 </div>

@@ -24,12 +24,26 @@ public static class Configuration
     public static string BaseUrl { get; set; }
     public static string HCaptchaPublicKey { get; set; }
     public static string HCaptchaPrivateKey { get; set; }
-    public static IEnumerable<GameServerConfigEntry> GameServerIpAddresses { get; set; }
+    // Empty by default: a machine without any RCC hosts configured (a dev box, CI, a Linux sandbox)
+    // must report "no game servers available" instead of dereferencing null during a join.
+    public static IEnumerable<GameServerConfigEntry> GameServerIpAddresses { get; set; } =
+        Array.Empty<GameServerConfigEntry>();
     public static string GameServerAuthorization { get; set; }
     public static string RobloxAppPrefix { get; set; } = "rbxeconsim:";
     public static string AssetValidationServiceUrl { get; set; }
     public static string AssetValidationServiceAuthorization { get; set; }
     public static string BotAuthorization { get; set; }
+    // Discord account linking. A player has to prove they are in the Bloxyn Discord server before
+    // they can create an account, so these values drive the OAuth flow on /auth/discord.
+    public static string DiscordClientId { get; set; } = "";
+    public static string DiscordClientSecret { get; set; } = "";
+    public static string DiscordGuildId { get; set; } = "";
+    public static string DiscordGuildInviteUrl { get; set; } = "https://discord.gg/8dt3QVWd3j";
+    public static string DiscordBotToken { get; set; } = "";
+    public static string DiscordVerificationKey { get; set; } = "";
+    public static string DiscordRedirectUri { get; set; } = "";
+    // Set to false to let people sign up without Discord (emergency escape hatch).
+    public static bool DiscordSignupGateEnabled { get; set; } = true;
     public static string RccAuthorization { get; set; }
     public const string UserAgentBypassSecret = "503534DA-F2F8-4681-9B37-15EE9EAE88DC4D0FAE23-F672-4BC6-8D5F-E35A2939680DB1980985-AF9C-4B2E-B19E-67005FBAD27B";
     public static long PackageShirtAssetId { get; set; }

@@ -2162,6 +2162,19 @@ Thank you for your understanding,
         };
     }
 
+    /// <summary>
+    /// True when the bytes start with a Roblox model header, used as a fallback when the asset
+    /// validation service cannot be reached.
+    /// </summary>
+    private static bool LooksLikeRobloxFile(byte[] fileBytes)
+    {
+        if (fileBytes.Length < 8) return false;
+        var head = System.Text.Encoding.ASCII.GetString(fileBytes, 0, Math.Min(fileBytes.Length, 11));
+        return head.StartsWith("<roblox!", StringComparison.Ordinal) ||
+               head.StartsWith("<roblox ", StringComparison.Ordinal) ||
+               head.StartsWith("<roblox?", StringComparison.Ordinal);
+    }
+
     [HttpPost("asset/create"), StaffFilter(Access.CreateAsset)]
     public async Task<dynamic> CreateAsset([Required, FromForm] CreateAssetRequest request)
     {
@@ -2217,16 +2230,29 @@ Thank you for your understanding,
         Stream? file = null;
         if (request.rbxm != null)
         {
-            var fileData = request.rbxm.OpenReadStream();
+            // Hold the upload in memory: the validation call, the content hash and the DB write all read
+            // the stream, and a failed copy here would corrupt the asset.
+            byte[] fileBytes;
+            using (var buffer = new MemoryStream())
+            {
+                await request.rbxm.CopyToAsync(buffer);
+                fileBytes = buffer.ToArray();
+            }
+
             // TODO: we should probably be validating audio and image uploads...
             if (request.assetTypeId != Type.Audio && request.assetTypeId != Type.Image)
             {
-                var isOk = await services.assets.ValidateAssetFile(fileData, request.assetTypeId);
-                if (!isOk)
+                using var checkStream = new MemoryStream(fileBytes);
+                var verdict = await services.assets.ValidateAssetFileOrNull(checkStream, request.assetTypeId);
+                if (verdict == false)
                     throw new StaffException("The asset file doesn't look correct. Please try again.");
+                // A null verdict means the validation service is unreachable. Staff uploads should still
+                // work, so fall back to checking the Roblox file header ourselves.
+                if (verdict == null && !LooksLikeRobloxFile(fileBytes))
+                    throw new StaffException("The asset file doesn't look correct. Upload the .rbxm or .rbxmx model you saved from Studio.");
             }
-            fileData.Position = 0;
-            file = fileData;
+
+            file = new MemoryStream(fileBytes);
         }
 
         var assetDetails = await services.assets.CreateAsset(request.name, request.description, 1,

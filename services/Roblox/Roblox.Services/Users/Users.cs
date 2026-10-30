@@ -45,6 +45,51 @@ public class UsersService : ServiceBase, IService
         return true;
     }
 
+    /// <summary>
+    /// Discord account linked to a site account. Used by the signup gate and by /auth/discord so a
+    /// player can see which Discord account their site account belongs to.
+    /// </summary>
+    public async Task<DiscordAccountEntry?> GetDiscordAccount(long userId)
+    {
+        return await db.QuerySingleOrDefaultAsync<DiscordAccountEntry>(
+            "SELECT user_id as userId, discord_id as discordId, discord_username as discordUsername, " +
+            "is_guild_member as isGuildMember, linked_at as linkedAt FROM user_discord WHERE user_id = :userId",
+            new { userId });
+    }
+
+    public async Task<DiscordAccountEntry?> GetDiscordAccountByDiscordId(string discordId)
+    {
+        return await db.QuerySingleOrDefaultAsync<DiscordAccountEntry>(
+            "SELECT user_id as userId, discord_id as discordId, discord_username as discordUsername, " +
+            "is_guild_member as isGuildMember, linked_at as linkedAt FROM user_discord WHERE discord_id = :discordId",
+            new { discordId });
+    }
+
+    /// <summary>
+    /// Attaches a Discord account to a site account. Throws DiscordAlreadyLinkedException when another
+    /// site account already owns that Discord identity, so one Discord account cannot farm signups.
+    /// </summary>
+    public async Task LinkDiscordAccount(long userId, string discordId, string discordUsername, bool isGuildMember)
+    {
+        var existing = await GetDiscordAccountByDiscordId(discordId);
+        if (existing != null && existing.userId != userId)
+            throw new DiscordAlreadyLinkedException();
+
+        await db.ExecuteAsync(
+            "INSERT INTO user_discord (user_id, discord_id, discord_username, is_guild_member, linked_at) " +
+            "VALUES (:userId, :discordId, :discordUsername, :isGuildMember, now()) " +
+            "ON CONFLICT (user_id) DO UPDATE SET discord_id = :discordId, " +
+            "discord_username = :discordUsername, is_guild_member = :isGuildMember, linked_at = now()",
+            new { userId, discordId, discordUsername, isGuildMember });
+        Roblox.Logging.Writer.Info(Roblox.Logging.LogGroup.SignUp,
+            "Linked discord account. userId={0} discordId={1} member={2}", userId, discordId, isGuildMember);
+    }
+
+    public async Task UnlinkDiscordAccount(long userId)
+    {
+        await db.ExecuteAsync("DELETE FROM user_discord WHERE user_id = :userId", new { userId });
+    }
+
     public async Task<bool> IsNameAvailableForSignup(string username)
     {
         return await IsNameAvailableForNameChange(0, username);
@@ -1053,8 +1098,18 @@ public class UsersService : ServiceBase, IService
         });
         // Render outside transaction to prevent deadlock/unnecessary locks
 #if !DEBUG
-        using var av = ServiceProvider.GetOrCreate<AvatarService>();
-        await av.RedrawAvatar(result.userId, Roblox.Configuration.SignupAvatarAssetIds);
+        // A missing or unreachable RCC renderer must not fail signup: the account already exists at
+        // this point, and thumbnails can be drawn later.
+        try
+        {
+            using var av = ServiceProvider.GetOrCreate<AvatarService>();
+            await av.RedrawAvatar(result.userId, Roblox.Configuration.SignupAvatarAssetIds);
+        }
+        catch (Exception e)
+        {
+            Roblox.Logging.Writer.Info(Roblox.Logging.LogGroup.SignUp,
+                "Could not render the signup avatar for userId={0}, continuing anyway: {1}", result.userId, e.Message);
+        }
 #endif
         return result;
     }

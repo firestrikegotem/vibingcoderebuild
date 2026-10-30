@@ -385,9 +385,18 @@ public class GameServerService : ServiceBase
 
     public async Task<List<Tuple<GameServerInfoResponse,GameServerConfigEntry>>> GetAllGameServers()
     {
+        var configuredServers = Configuration.GameServerIpAddresses?.ToArray() ?? Array.Empty<GameServerConfigEntry>();
+        if (configuredServers.Length == 0)
+        {
+            // No RCC hosts are configured, so there is nothing to poll. Callers treat this as "no
+            // servers running" rather than an error.
+            Writer.Info(LogGroup.GameServerJoin, "No game server hosts are configured (missing appsettings GameServers section)");
+            return new List<Tuple<GameServerInfoResponse, GameServerConfigEntry>>();
+        }
+
         var getServerDataTasks = new List<Task<GameServerInfoResponse?>>();
         // dev shortcut above returns before this loop, which is intentional
-        foreach (var entry in Configuration.GameServerIpAddresses)
+        foreach (var entry in configuredServers)
         {
             var data = entry.ip.Split(":");
             var ip = data[0];
@@ -398,7 +407,7 @@ public class GameServerService : ServiceBase
         var getServerDataResults = await Task.WhenAll(getServerDataTasks);
 
         var serverData =getServerDataResults.Select((c, idx) =>
-                new Tuple<GameServerInfoResponse?, GameServerConfigEntry>(c, Configuration.GameServerIpAddresses.ToArray()[idx]))
+                new Tuple<GameServerInfoResponse?, GameServerConfigEntry>(c, configuredServers[idx]))
             .Where(v => v.Item1 != null)
             .ToList();
         return serverData!;
@@ -470,6 +479,16 @@ public class GameServerService : ServiceBase
         }
         // Sort by least loaded
         serverData = serverData.Where(a => a.Item1 != null && a.Item1.data != null).ToList();
+        if (serverData.Count == 0)
+        {
+            // Nothing is running and there is no host to start a server on, so tell the client to
+            // wait instead of throwing a 500 from the join request.
+            Writer.Info(LogGroup.GameServerJoin, "No game servers available for placeId = {0}", placeId);
+            return new GameServerGetOrCreateResponse
+            {
+                status = JoinStatus.Waiting,
+            };
+        }
         serverData.Sort((a, b) =>
         {
             var cOne = a.Item1!.data.Count();

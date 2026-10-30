@@ -24,6 +24,9 @@ public class ApplicationGuardMiddleware
     {
         "/auth/captcha",
         "/auth/discord",
+        "/auth/discord/oauth",
+        "/auth/discord/callback",
+        "/auth/discord/unlink",
         "/auth/submit",
         "/auth/home",
         "/auth/privacy",

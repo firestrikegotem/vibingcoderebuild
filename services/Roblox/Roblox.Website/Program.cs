@@ -63,6 +63,42 @@ Roblox.Configuration.PackageRightLegAssetId = long.Parse(configuration.GetSectio
 Roblox.Configuration.PackageTorsoAssetId = long.Parse(configuration.GetSection("PackageTorsoAssetId").Value);
 Roblox.Libraries.TwitterApi.TwitterApi.Configure(configuration.GetSection("Twitter:Bearer").Value);
 
+// Discord (signup gate). Environment variables win over appsettings so the client secret and bot
+// token do not have to live in the repo. A blank value in appsettings also falls through to the
+// environment, which is how the secret is supplied locally.
+static string DiscordSetting(IConfiguration configuration, string key, string? envName)
+{
+    var fromFile = configuration.GetSection("Discord:" + key).Value;
+    if (!string.IsNullOrWhiteSpace(fromFile)) return fromFile.Trim();
+    if (!string.IsNullOrWhiteSpace(envName))
+    {
+        var fromEnv = Environment.GetEnvironmentVariable(envName);
+        if (!string.IsNullOrWhiteSpace(fromEnv)) return fromEnv.Trim();
+    }
+    return "";
+}
+
+Roblox.Configuration.DiscordClientId = DiscordSetting(configuration, "ClientId", "DISCORD_CLIENT_ID");
+Roblox.Configuration.DiscordClientSecret = DiscordSetting(configuration, "ClientSecret", "DISCORD_CLIENT_SECRET");
+Roblox.Configuration.DiscordBotToken = DiscordSetting(configuration, "BotToken", "DISCORD_BOT_TOKEN");
+Roblox.Configuration.DiscordGuildId = DiscordSetting(configuration, "GuildId", "DISCORD_GUILD_ID");
+Roblox.Configuration.DiscordGuildInviteUrl = DiscordSetting(configuration, "InviteUrl", null);
+if (string.IsNullOrWhiteSpace(Roblox.Configuration.DiscordGuildInviteUrl))
+    Roblox.Configuration.DiscordGuildInviteUrl = "https://discord.gg/8dt3QVWd3j";
+// Blank redirect URI means "derive it from the request", so the same build works on
+// http://127.0.0.1:5000 and on https://bloxyn.net without editing config.
+Roblox.Configuration.DiscordRedirectUri = DiscordSetting(configuration, "RedirectUri", "DISCORD_REDIRECT_URI");
+Roblox.Configuration.DiscordVerificationKey = DiscordSetting(configuration, "VerificationKey", "DISCORD_VERIFICATION_KEY");
+if (string.IsNullOrWhiteSpace(Roblox.Configuration.DiscordVerificationKey))
+    Roblox.Configuration.DiscordVerificationKey = Roblox.Configuration.GameServerAuthorization;
+if (configuration.GetSection("Discord:SignupGateEnabled").Value != null)
+    Roblox.Configuration.DiscordSignupGateEnabled =
+        !configuration.GetSection("Discord:SignupGateEnabled").Value!.Equals("false", StringComparison.OrdinalIgnoreCase);
+Roblox.Libraries.Discord.DiscordApi.Configure(Roblox.Configuration.DiscordClientId,
+    Roblox.Configuration.DiscordClientSecret, Roblox.Configuration.DiscordGuildId,
+    Roblox.Configuration.DiscordGuildInviteUrl, Roblox.Configuration.DiscordBotToken,
+    Roblox.Configuration.DiscordRedirectUri ?? "", Roblox.Configuration.DiscordVerificationKey);
+
 // Sign up asset ids
 var assetIdsStart = configuration.GetSection("SignupAssetIds").GetChildren().Select(assetIdStr => long.Parse(assetIdStr.Value));
 Roblox.Configuration.SignupAssetIds = assetIdsStart;

@@ -17,8 +17,17 @@ namespace Roblox.Rendering
 
         public static void Configure(string baseUrl, string authorization)
         {
-            var url = new Uri(baseUrl + "?key=" + HttpUtility.UrlEncode(authorization));
-            wsUrl = url;
+            // The render service is a websocket endpoint but config gives us a plain http URL, so
+            // upgrade the scheme instead of failing every reconnect with "Only Uris starting with ws".
+            var builder = new UriBuilder(baseUrl);
+            builder.Scheme = builder.Scheme switch
+            {
+                "http" => "ws",
+                "https" => "wss",
+                _ => builder.Scheme,
+            };
+            builder.Query = "key=" + HttpUtility.UrlEncode(authorization);
+            wsUrl = builder.Uri;
 
             Task.Run(async () =>
             {

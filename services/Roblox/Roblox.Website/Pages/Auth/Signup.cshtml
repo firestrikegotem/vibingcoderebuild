@@ -25,6 +25,31 @@
             </p>
         }
 
+        @if (Model.discordVerification != null)
+        {
+            <div class="auths-discord auths-discord--ok">
+                <span class="auths-discord-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5"></path>
+                    </svg>
+                </span>
+                <span>Discord linked as <strong>@Model.discordVerification.username</strong></span>
+            </div>
+        }
+        else if (Model.discordRequired)
+        {
+            <div class="auths-discord">
+                <span class="auths-discord-title">Step 1: link your Discord</span>
+                <p class="auths-discord-text">
+                    Bloxyn is a Discord community first. Join our server, then connect your Discord account to unlock signup.
+                </p>
+                <div class="auths-discord-actions">
+                    <a class="auths-discord-btn" href="@Model.discordInviteUrl" target="_blank" rel="noopener noreferrer">Join the server</a>
+                    <a class="auths-discord-btn auths-discord-btn--primary" href="@Model.discordOAuthUrl">Connect Discord</a>
+                </div>
+            </div>
+        }
+
         @if (Model.errorMessage != null)
         {
             <p class="auths-error">@Model.errorMessage</p>
@@ -34,21 +59,21 @@
             <div class="auths-field">
                 <label class="auths-label" for="signup-birth-month">Birthday</label>
                 <div class="auths-birthday">
-                    <select id="signup-birth-month" name="birthMonth" class="auths-select auths-birthday-month" disabled="@Model.signupDisabled">
+                    <select id="signup-birth-month" name="birthMonth" class="auths-select auths-birthday-month" disabled="@(Model.signupDisabled || Model.discordRequired)">
                         <option value="" selected="@(Model.birthMonth == null)">Month</option>
                         @for (var month = 1; month <= 12; month++)
                         {
                             <option value="@month" selected="@(Model.birthMonth == month)">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month)</option>
                         }
                     </select>
-                    <select id="signup-birth-day" name="birthDay" class="auths-select auths-birthday-day" disabled="@Model.signupDisabled">
+                    <select id="signup-birth-day" name="birthDay" class="auths-select auths-birthday-day" disabled="@(Model.signupDisabled || Model.discordRequired)">
                         <option value="" selected="@(Model.birthDay == null)">Day</option>
                         @for (var day = 1; day <= 31; day++)
                         {
                             <option value="@day" selected="@(Model.birthDay == day)">@day</option>
                         }
                     </select>
-                    <select id="signup-birth-year" name="birthYear" class="auths-select auths-birthday-year" disabled="@Model.signupDisabled">
+                    <select id="signup-birth-year" name="birthYear" class="auths-select auths-birthday-year" disabled="@(Model.signupDisabled || Model.discordRequired)">
                         <option value="" selected="@(Model.birthYear == null)">Year</option>
                         @for (var year = currentYear; year >= 1900; year--)
                         {
@@ -60,19 +85,19 @@
 
             <div class="auths-field">
                 <label class="auths-label" for="signup-username">Username</label>
-                <input id="signup-username" disabled="@Model.signupDisabled" type="text" placeholder="Don't use your real name" name="username" value="@Model.username" class="auths-input" autocomplete="username" />
+                <input id="signup-username" disabled="@(Model.signupDisabled || Model.discordRequired)" type="text" placeholder="Don't use your real name" name="username" value="@Model.username" class="auths-input" autocomplete="username" />
             </div>
 
             <div class="auths-field">
                 <label class="auths-label" for="signup-password">Password</label>
-                <input id="signup-password" disabled="@Model.signupDisabled" type="password" placeholder="At least 8 characters" name="password" class="auths-input" autocomplete="new-password" />
+                <input id="signup-password" disabled="@(Model.signupDisabled || Model.discordRequired)" type="password" placeholder="At least 8 characters" name="password" class="auths-input" autocomplete="new-password" />
             </div>
 
             <div class="auths-field">
                 <span class="auths-label">Gender <span class="auths-optional">(optional)</span></span>
                 <div class="auths-gender">
                     <label class="auths-gender-opt">
-                        <input disabled="@Model.signupDisabled" type="radio" name="gender" value="male" checked="@(Model.gender == "male")" />
+                        <input disabled="@(Model.signupDisabled || Model.discordRequired)" type="radio" name="gender" value="male" checked="@(Model.gender == "male")" />
                         <span class="auths-gender-seg" title="Male">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <circle cx="10" cy="14" r="5.2"></circle>
@@ -83,7 +108,7 @@
                         </span>
                     </label>
                     <label class="auths-gender-opt">
-                        <input disabled="@Model.signupDisabled" type="radio" name="gender" value="female" checked="@(Model.gender == "female")" />
+                        <input disabled="@(Model.signupDisabled || Model.discordRequired)" type="radio" name="gender" value="female" checked="@(Model.gender == "female")" />
                         <span class="auths-gender-seg" title="Female">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <circle cx="12" cy="9" r="5.2"></circle>
@@ -102,7 +127,7 @@
             </p>
 
             @Html.AntiForgeryToken()
-            <button disabled="@Model.signupDisabled" class="auths-submit" type="submit" id="signup-submit">Sign Up</button>
+            <button disabled="@(Model.signupDisabled || Model.discordRequired)" class="auths-submit" type="submit" id="signup-submit">Sign Up</button>
         </form>
     </div>
 
