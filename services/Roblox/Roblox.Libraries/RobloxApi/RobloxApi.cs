@@ -51,43 +51,43 @@ public class UsersResponseV1
 public class AssetTypeEntry
 {
     public int id { get; set; }
-    public string name { get; set; }
+    public string name { get; set; } = null!;
 }
 
 public class AvatarAsset
 {
     public long id { get; set; }
-    public AssetTypeEntry assetType { get; set; }
+    public AssetTypeEntry assetType { get; set; } = null!;
 }
 
 public class AvatarResponse
 {
-    public IEnumerable<AvatarAsset> assets { get; set; }
+    public IEnumerable<AvatarAsset> assets { get; set; } = null!;
 }
 
 public class MultiGetDetailsRequestEntry
 {
-    public string itemType { get; set; }
+    public string itemType { get; set; } = null!;
     public long id { get; set; }
 }
 
 public class MultiGetDetailsRequest
 {
-    public IEnumerable<MultiGetDetailsRequestEntry> items { get; set; }
+    public IEnumerable<MultiGetDetailsRequestEntry> items { get; set; } = null!;
 }
 
 public class MultiGetDetailsResponseEntry
 {
     public long id { get; set; }
-    public string itemType { get; set; }
+    public string itemType { get; set; } = null!;
     public int price { get; set; }
-    public string creatorType { get; set; }
+    public string creatorType { get; set; } = null!;
     public long creatorTargetId { get; set; }
 }
 
 public class MultiGetDetailsResponse
 {
-    public IEnumerable<MultiGetDetailsResponseEntry> data { get; set; }
+    public IEnumerable<MultiGetDetailsResponseEntry> data { get; set; } = null!;
 }
 
 public class CountResponse
@@ -102,7 +102,7 @@ public class InventoryEntry
 
 public class InventoryResponse
 {
-    public IEnumerable<InventoryEntry> data { get; set; }
+    public IEnumerable<InventoryEntry> data { get; set; } = null!;
 }
 
 public class InvalidUserException : Exception
@@ -120,16 +120,16 @@ public class ProfileHeaderResponse
     [JsonPropertyName("IsVieweePremiumOnlyUser")]
     public bool isPremium { get; set; }
     [JsonPropertyName("ProfileDisplayName")]
-    public string displayName { get; set; }
+    public string displayName { get; set; } = null!;
     [JsonPropertyName("PreviousUserNames")]
-    public string previousUsernames { get; set; }
+    public string previousUsernames { get; set; } = null!;
 }
 
 public class BundleItemEntry
 {
     public long id { get; set; }
-    public string name { get; set; }
-    public string type { get; set; }
+    public string name { get; set; } = null!;
+    public string type { get; set; } = null!;
 }
 
 public class BundleProduct
@@ -140,16 +140,16 @@ public class BundleProduct
 public class BundleResponseEntry
 {
     public long id { get; set; }
-    public string name { get; set; }
-    public string description { get; set; }
-    public string bundleType { get; set; }
-    public List<BundleItemEntry> items { get; set; }
-    public BundleProduct product { get; set; }
+    public string name { get; set; } = null!;
+    public string description { get; set; } = null!;
+    public string bundleType { get; set; } = null!;
+    public List<BundleItemEntry> items { get; set; } = null!;
+    public BundleProduct product { get; set; } = null!;
 }
 
 public class MultiGetBundlesResponse
 {
-    public List<BundleResponseEntry> data { get; set; }
+    public List<BundleResponseEntry> data { get; set; } = null!;
 }
 
 public class RobloxApi

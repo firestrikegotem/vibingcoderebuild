@@ -12,8 +12,23 @@ internal class HCaptchaJsonResponse
 public class HCaptcha
 {
     private static HttpClient client { get; } = new();
+    /// <summary>
+    /// True when both hCaptcha keys are configured. Self-hosted deployments often run without
+    /// captcha keys; in that case the widget renders nothing and every check would fail closed,
+    /// locking everyone out of login/reset/application forms.
+    /// </summary>
+    public static bool IsEnabled =>
+        !string.IsNullOrEmpty(Roblox.Configuration.HCaptchaPublicKey) &&
+        !string.IsNullOrEmpty(Roblox.Configuration.HCaptchaPrivateKey);
+
     public static async Task<bool> IsValid(string rawIpAddress, string captchaResponse)
     {
+        if (!IsEnabled)
+        {
+            Writer.Info(LogGroup.Captcha, "hCaptcha is not configured (HCaptcha:Public / HCaptcha:Private are empty), skipping verification");
+            return true;
+        }
+
         try
         {
             var cont = new FormUrlEncodedContent(new Dictionary<string,string>

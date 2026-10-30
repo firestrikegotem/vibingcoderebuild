@@ -109,3 +109,36 @@ html div.container {
 .br-none {
 	border-radius: 0!important;
 }
+
+/* Sign up / login page background */
+.login-page-background {
+	background-image: url('/img/bloxyn_signup_bg_v2.jpg');
+	background-size: cover;
+	background-position: center center;
+	background-repeat: no-repeat;
+	background-color: #66d1ff;
+	min-height: 100vh;
+	width: 100%;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding: 40px 12px 60px;
+}
+
+.login-page-container {
+	min-height: auto !important;
+	background: rgba(255, 255, 255, 0.94);
+	border-radius: 6px;
+	padding: 24px 20px 8px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 575px) {
+	.login-page-background {
+		padding: 16px 8px 32px;
+	}
+
+	.login-page-container {
+		padding: 16px 12px 4px;
+	}
+}

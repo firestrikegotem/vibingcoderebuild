@@ -4,6 +4,7 @@ using Roblox.Dto.Users;
 using Roblox.Logging;
 using Roblox.Models.Economy;
 using Roblox.Services.Exceptions;
+using Roblox.Models.Assets;
 
 namespace Roblox.Services;
 
@@ -156,9 +157,9 @@ public class CurrencyExchangeService : ServiceBase, IService
         var ec = ServiceProvider.GetOrCreate<EconomyService>(this);
         // Transfer
         // Give source user the money they purchased
-        await ec.IncrementCurrency(sourceData.userId, destData.sourceCurrency, desiredAmount);
+        await ec.IncrementCurrency(CreatorType.User, sourceData.userId, destData.sourceCurrency, desiredAmount);
         // Give dest user the money they earned
-        await ec.IncrementCurrency(destData.userId, destData.destinationCurrency, amountToTakeFromSource);
+        await ec.IncrementCurrency(CreatorType.User, destData.userId, destData.destinationCurrency, amountToTakeFromSource);
         // Exchange transactions
         await InsertExchangeLog(sourceOrderId, destData.userId, desiredAmount, amountToTakeFromSource);
         await InsertExchangeLog(toBuyOrderId, sourceData.userId, amountToTakeFromSource, desiredAmount);
@@ -303,7 +304,7 @@ public class CurrencyExchangeService : ServiceBase, IService
         if (details.balance != 0)
         {
             using var ec = ServiceProvider.GetOrCreate<EconomyService>(this);
-            await ec.IncrementCurrency(details.userId, details.sourceCurrency, details.balance);
+            await ec.IncrementCurrency(CreatorType.User, details.userId, details.sourceCurrency, details.balance);
         }
     }
 
@@ -400,7 +401,7 @@ public class CurrencyExchangeService : ServiceBase, IService
                 throw new RobloxException(400, 0, "You do not have enough currency to make this trade");
             }
             // decrement
-            await ec.DecrementCurrency(userId, sourceCurrency, amount);
+            await ec.DecrementCurrency(CreatorType.User, userId, sourceCurrency, amount);
             // Record the position first
             var orderId = await InsertAsync("trade_currency_order", "id", new
             {

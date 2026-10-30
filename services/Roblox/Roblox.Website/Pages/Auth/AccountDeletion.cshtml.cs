@@ -73,7 +73,7 @@ public class AccountDeletion : RobloxPageModel
             return new PageResult();
         }
 
-        var loginOk = await services.users.VerifyPassword(user[0].id, password);
+        var loginOk = await services.users.VerifyPassword(user[0].id, password!);
         if (!loginOk)
         {
             username = null;
@@ -93,7 +93,7 @@ public class AccountDeletion : RobloxPageModel
         }
 
         // reset av
-        services.avatar.RedrawAvatar(user[0].id, new List<long>(), new ColorEntry()
+        _ = services.avatar.RedrawAvatar(user[0].id, new List<long>(), new ColorEntry()
         {
             headColorId = 194,
             torsoColorId = 23,

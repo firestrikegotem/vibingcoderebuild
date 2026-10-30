@@ -58,6 +58,20 @@ public class ChatService : ServiceBase, IService
         return latestMessage != null && (userHasRead == null || latestMessage.createdAt > userHasRead.lastReadAt);
     }
 
+    public async Task<long> CountUnreadConversations(long contextUserId)
+    {
+        var result = await db.QuerySingleOrDefaultAsync<Dto.Total>(@"
+            SELECT COUNT(*) AS total FROM (
+                SELECT p.conversation_id,
+                       (SELECT MAX(m.created_at) FROM user_conversation_message m WHERE m.conversation_id = p.conversation_id) AS latestMessageAt,
+                       (SELECT r.updated_at FROM user_conversation_message_read r WHERE r.conversation_id = p.conversation_id AND r.user_id = p.user_id LIMIT 1) AS lastReadAt
+                FROM user_conversation_participant p
+                WHERE p.user_id = @userId
+            ) t WHERE t.latestMessageAt IS NOT NULL AND (t.lastReadAt IS NULL OR t.latestMessageAt > t.lastReadAt)",
+            new { userId = contextUserId });
+        return result?.total ?? 0;
+    }
+
     public async Task<Message?> GetMessageById(string messageId)
     {
         return await db.QuerySingleOrDefaultAsync<Message?>("SELECT id, conversation_id as conversationId, user_id as userId, created_at as createdAt, message FROM user_conversation_message WHERE id = :id",
@@ -201,7 +215,7 @@ public class ChatService : ServiceBase, IService
             {
                 try
                 {
-                    var data = JsonSerializer.Deserialize<T>(msg.Message);
+                    var data = JsonSerializer.Deserialize<T>(msg.Message!);
                     if (data != null)
                     {
                         handler(data);

@@ -10,7 +10,7 @@
             <div class="card card-body">
                 <h3>Account Banned</h3>
                 <p class="mb-0">
-                    @if (Model.ban.expiredAt != null)
+                    @if (Model.ban!.expiredAt != null)
                     {
                         <span>Your account has been temporarily banned from this website for the following reason:</span>
                     }

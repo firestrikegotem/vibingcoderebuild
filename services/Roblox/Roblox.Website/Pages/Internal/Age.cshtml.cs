@@ -22,11 +22,11 @@ public class Age : RobloxPageModel
     
     public async Task OnPost()
     {
-        if (await services.users.Is18Plus(userSession.userId))
+        if (await services.users.Is18Plus(safeUserSession.userId))
             return;
 
 
         is18Plus = true;
-        await services.users.MarkAs18Plus(userSession.userId);
+        await services.users.MarkAs18Plus(safeUserSession.userId);
     }
 }

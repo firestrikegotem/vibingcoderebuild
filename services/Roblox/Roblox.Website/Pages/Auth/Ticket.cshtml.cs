@@ -18,9 +18,9 @@ public class Ticket : RobloxPageModel
     [FromForm(Name = "h-captcha-response")]
     public string hCaptchaResponse { get; set; }
     
-    public async Task OnAny()
+    public Task OnAny()
     {
-        
+        return Task.CompletedTask;
     }
 
     private bool ValidateSubjectAndBody()

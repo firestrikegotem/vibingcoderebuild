@@ -44,12 +44,12 @@ public class PasswordReset : RobloxPageModel
         return FeatureFlags.IsEnabled(FeatureFlag.PasswordReset);
     }
     
-    public async Task<IActionResult> OnGet()
+    public Task<IActionResult> OnGet()
     {
         if (!IsEnabled())
-            return new RedirectResult("/auth/login");
+            return Task.FromResult<IActionResult>(new RedirectResult("/auth/login"));
         
-        return new PageResult();
+        return Task.FromResult<IActionResult>(new PageResult());
     }
 
     private async Task<bool> TryGenerateCode()

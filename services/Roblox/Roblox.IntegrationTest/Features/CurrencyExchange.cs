@@ -4,6 +4,7 @@ using Roblox.Services;
 using Roblox.Services.Exceptions;
 using Roblox.Services.IntegrationTest;
 using Xunit;
+using Roblox.Models.Assets;
 
 public class CurrencyExchangeTest : TestBase
 {
@@ -15,7 +16,7 @@ public class CurrencyExchangeTest : TestBase
         using var us = ServiceProvider.GetOrCreate<UsersService>();
         using var ec = ServiceProvider.GetOrCreate<EconomyService>();
         // give users money
-        await ec.IncrementCurrency(sellerOne, CurrencyType.Tickets, 1000);
+        await ec.IncrementCurrency(CreatorType.User, sellerOne, CurrencyType.Tickets, 1000);
         var sellerNewBal = await ec.GetUserBalance(sellerOne);
         Assert.Equal(100, sellerNewBal.robux);
         var buyerNewBal = await ec.GetUserBalance(buyer);
@@ -50,7 +51,7 @@ public class CurrencyExchangeTest : TestBase
         using var us = ServiceProvider.GetOrCreate<UsersService>();
         using var ec = ServiceProvider.GetOrCreate<EconomyService>();
         // give users money
-        await ec.IncrementCurrency(seller, CurrencyType.Tickets, 1000);
+        await ec.IncrementCurrency(CreatorType.User, seller, CurrencyType.Tickets, 1000);
         var sellerNewBal = await ec.GetUserBalance(seller);
         Assert.Equal(100, sellerNewBal.robux);
         var buyerNewBal = await ec.GetUserBalance(buyer);
@@ -85,8 +86,8 @@ public class CurrencyExchangeTest : TestBase
         using var us = ServiceProvider.GetOrCreate<UsersService>();
         using var ec = ServiceProvider.GetOrCreate<EconomyService>();
         // give users money
-        await ec.IncrementCurrency(buyer, CurrencyType.Tickets, 1000);
-        // await us.IncrementCurrency(seller, CurrencyType.Robux, 100); // you start with a bal of 100
+        await ec.IncrementCurrency(CreatorType.User, buyer, CurrencyType.Tickets, 1000);
+        // await us.IncrementCurrency(CreatorType.User, seller, CurrencyType.Robux, 100); // you start with a bal of 100
         var sellerNewBal = await ec.GetUserBalance(seller);
         Assert.Equal(100, sellerNewBal.robux);
         var buyerNewBal = await ec.GetUserBalance(buyer);
@@ -119,7 +120,7 @@ public class CurrencyExchangeTest : TestBase
         using var us = ServiceProvider.GetOrCreate<UsersService>();
         using var ec = ServiceProvider.GetOrCreate<EconomyService>();
 
-        // await us.IncrementCurrency(seller, CurrencyType.Robux, 100); // you start with a bal of 100
+        // await us.IncrementCurrency(CreatorType.User, seller, CurrencyType.Robux, 100); // you start with a bal of 100
         var sellerNewBal = await ec.GetUserBalance(seller);
         Assert.Equal(100, sellerNewBal.robux);
 

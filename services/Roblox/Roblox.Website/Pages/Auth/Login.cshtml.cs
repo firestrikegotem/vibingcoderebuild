@@ -110,7 +110,7 @@ public class Login : RobloxPageModel
             return new PageResult();
         }
 
-        if (string.IsNullOrEmpty(hCaptchaResponse))
+        if (HCaptcha.IsEnabled && string.IsNullOrEmpty(hCaptchaResponse))
         {
             errorMessage = BadCaptchaMessage;
             return new PageResult();
@@ -146,7 +146,7 @@ public class Login : RobloxPageModel
         }
 
         // Check captcha AFTER basic validation (but not before username/password checks!)
-        if (!await HCaptcha.IsValid(rawIpAddress, hCaptchaResponse))
+        if (!await HCaptcha.IsValid(rawIpAddress, hCaptchaResponse!))
         {
             errorMessage = BadCaptchaMessage;
             Metrics.UserMetrics.ReportCaptchaFailure(UserMetrics.CaptchaFailureType.Login);

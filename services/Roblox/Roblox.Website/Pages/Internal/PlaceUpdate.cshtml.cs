@@ -54,13 +54,13 @@ public class PlaceUpdate : RobloxPageModel
         }
     }
     
-    public async Task<IActionResult> OnGet()
+    public Task<IActionResult> OnGet()
     {
-        return new RedirectResult("/places/" + placeId + "/update");
+        return Task.FromResult<IActionResult>(new RedirectResult("/places/" + placeId + "/update"));
     }
 
-    public async Task<IActionResult> OnPost()
+    public Task<IActionResult> OnPost()
     {
-        return new RedirectResult("/places/" + placeId + "/update");
+        return Task.FromResult<IActionResult>(new RedirectResult("/places/" + placeId + "/update"));
     }
 }

@@ -378,7 +378,7 @@ public class UsersService : ServiceBase, IService
                 throw new NotEnoughRobuxForPurchaseException();
 
             // subtract from balance
-            await ec.DecrementCurrency(userId, CurrencyType.Robux, 1000);
+            await ec.DecrementCurrency(CreatorType.User, userId, CurrencyType.Robux, 1000);
 
             // trans
             await InsertAsync("user_transaction", new
@@ -1730,7 +1730,7 @@ public class UsersService : ServiceBase, IService
             {
                 // increment balance, create transaction
                 using var ec = ServiceProvider.GetOrCreate<EconomyService>(this);
-                await ec.IncrementCurrency(userId, CurrencyType.Tickets, dailyTickets);
+                await ec.IncrementCurrency(CreatorType.User, userId, CurrencyType.Tickets, dailyTickets);
                 await InsertAsync("user_transaction", new
                 {
                     type = PurchaseType.TicketsStipend,
@@ -2148,11 +2148,11 @@ public class UsersService : ServiceBase, IService
     private static Object staffMux { get; } = new();
     private static Dictionary<long, bool> staffDic { get; } = new();
 
-    public async Task<bool> IsUserStaff(long userId)
+    public Task<bool> IsUserStaff(long userId)
     {
         lock (staffMux)
         {
-            return staffDic.ContainsKey(userId) && staffDic[userId];
+            return Task.FromResult(staffDic.ContainsKey(userId) && staffDic[userId]);
         }
     }
 

@@ -40,15 +40,6 @@ else
     <a class="ad" title="@Model.ad.name" href="@Model.redirectUrl" target="_top">
         <img src="@Model.imageUrl" alt="@Model.ad.name" height="@Model.ad.height" width="@Model.ad.width"/>
     </a>
-    @if (false)
-    {
-        <div class="ad-annotations" style="width: 728px">
-            <span class="ad-identification">
-                <span class="ad-identification-text">Advertisement</span>
-            </span>
-            <a class="BadAdButton" target="_top" href="/abusereport/Asset?id=@Model.ad.id" title="click to report an offensive ad">Report</a>
-        </div>
-    }
     </body>
 }
 </html>

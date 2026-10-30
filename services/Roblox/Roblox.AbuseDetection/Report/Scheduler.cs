@@ -5,10 +5,10 @@ namespace Roblox.AbuseDetection;
 
 public static class Scheduler
 {
-    private static async Task RunTaskIfAvailable(string taskName, Func<Task> cb, TimeSpan executionFrequency, bool exclusiveLockRequired)
+    private static Task RunTaskIfAvailable(string taskName, Func<Task> cb, TimeSpan executionFrequency, bool exclusiveLockRequired)
     {
         // Check if running (quick)
-        
+        return Task.CompletedTask;
     }
     
     public static void AddTask(string taskName, Func<Task> cb, TimeSpan executionFrequency, bool exclusiveLockRequired)

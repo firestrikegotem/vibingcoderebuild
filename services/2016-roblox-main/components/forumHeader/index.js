@@ -35,7 +35,7 @@ export default ForumHeader;
 export const ForumHeaderSubCategory = ({cat, sub}) => {
   return <ForumHeader>
     <p className='fw-bold'>
-      <Link href='/Forum/Default.aspx'><a>ROBLOX Forum</a></Link>{' » '}
+      <Link href='/Forum/Default.aspx'><a>BLOXYN Forum</a></Link>{' » '}
       <Link href={'/Forum/ForumGroup.aspx?ForumID='+cat.id}><a>{cat.name}</a></Link>{' » '}
       <Link href={'/Forum/ShowForum.aspx?ForumID=' + sub.id}><a>{sub.name}</a></Link>
     </p>

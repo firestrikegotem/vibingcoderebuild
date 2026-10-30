@@ -147,7 +147,7 @@ public class TradesControllerV1 : ControllerBase
         }
         // re-render
         var parties = await services.trades.GetTradeById(tradeId);
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             using var avatarService = ServiceProvider.GetOrCreate<AvatarService>();
             try
@@ -167,6 +167,21 @@ public class TradesControllerV1 : ControllerBase
     {
         FeatureCheck();
         await services.trades.DeclineTrade(tradeId, safeUserSession.userId);
+    }
+
+    [HttpPost("trades/{tradeId:long}/counter")]
+    public async Task CounterTrade(long tradeId, [Required, FromBody] CreateTradeRequest request)
+    {
+        FeatureCheck();
+        var trade = await services.trades.GetTradeById(tradeId);
+        if (trade.status != TradeStatus.Open)
+            throw new RobloxException(400, 0, "This trade is no longer open");
+        // Only the two participants may counter a trade
+        if (trade.userIdOne != safeUserSession.userId && trade.userIdTwo != safeUserSession.userId)
+            throw new RobloxException(403, 0, "Unauthorized");
+        // A counter offer replaces the original trade, matching Roblox behaviour
+        await services.trades.DeclineTrade(tradeId, safeUserSession.userId);
+        await services.trades.SendTrade(safeUserSession.userId, request.offers, true);
     }
 
     [HttpPost("trades/send")]

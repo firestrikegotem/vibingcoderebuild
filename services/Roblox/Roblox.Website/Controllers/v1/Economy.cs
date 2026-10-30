@@ -177,7 +177,7 @@ public class EconomyControllerV1 : ControllerBase
         }
         else
         {
-            throw new NotImplementedException(); // Unexpected branch
+            throw new BadRequestException(0, "Unsupported currency type");
         }
         // Confirm seller matches
         if (details.creatorTargetId != request.expectedSellerId)
@@ -231,7 +231,7 @@ public class EconomyControllerV1 : ControllerBase
             // User is making UAID purchase
             await PurchaseResellableItem(assetId, request);
             // Update sellers avatar in background (in case they were wearing the item they sold)
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 using var avatarService = ServiceProvider.GetOrCreate<AvatarService>();
                 await avatarService.RedrawAvatar(request.expectedSellerId);
@@ -316,7 +316,7 @@ public class EconomyControllerV1 : ControllerBase
     }
     
     [HttpGet("groups/{groupId}/users-payout-eligibility")]
-    public async Task<dynamic> GetUserPayoutEligibility(long groupId, string userIds)
+    public Task<dynamic> GetUserPayoutEligibility(long groupId, string userIds)
     {
         var ids = userIds.Split(",").Select(long.Parse).Distinct();
         var result = new Dictionary<string, string>();
@@ -324,10 +324,10 @@ public class EconomyControllerV1 : ControllerBase
         {
             result[id.ToString()] = "Eligible";
         }
-        return new
+        return Task.FromResult<dynamic>(new
         {
             usersGroupPayoutEligibility = result,
-        };
+        });
     }
 
     [HttpGet("groups/{groupId:long}/revenue/summary/{timePeriod}")]

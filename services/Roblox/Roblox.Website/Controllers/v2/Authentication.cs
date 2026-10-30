@@ -136,7 +136,8 @@ public class AuthenticationControllerV2 : ControllerBase
             throw new ForbiddenException(9, "Password is too simple");
         
         // Initial cooldown check - to prevent people spamming attempts
-        await services.cooldown.CooldownCheck($"signup:step1:" + GetIP(), TimeSpan.FromSeconds(5));
+        if (!await services.cooldown.TryCooldownCheck($"signup:step1:" + GetIP(), TimeSpan.FromSeconds(5)))
+            throw new CooldownException();
         // Now make the account
         var createdUser =
             await services.users.CreateUser(request.username, request.password, Enum.Parse<Gender>(request.gender));

@@ -114,7 +114,7 @@ public class WebController : ControllerBase
             case UserAdvertisementTargetType.Group:
                 return Redirect("/My/Groups.aspx?gid=" + ad.targetId);
             default:
-                throw new NotImplementedException();
+                return Redirect("/home");
         }
     }
 
@@ -240,7 +240,7 @@ public class WebController : ControllerBase
     public async Task<dynamic> AddComment([Required, FromBody] AddCommentRequest request)
     {
         FeatureFlags.FeatureCheck(FeatureFlag.AssetCommentsEnabled);
-        try { await services.assets.AddComment(request.assetId, userSession.userId, request.text); return new { ErrorCode = (string?)null }; }
+        try { await services.assets.AddComment(request.assetId, safeUserSession.userId, request.text); return new { ErrorCode = (string?)null }; }
         catch (ArgumentException e) { return new { ErrorCode = e.Message }; }
     }
 
@@ -252,7 +252,7 @@ public class WebController : ControllerBase
         var modInfo = (await services.assets.MultiGetAssetDeveloperDetails(new[] {placeId})).First();
         if (modInfo.moderationStatus != ModerationStatus.ReviewApproved) throw new BadRequestException();
         var ipAddress = GetIP();
-        var ticket = services.gameServer.CreateTicket(userSession.userId, placeId, ipAddress);
+        var ticket = services.gameServer.CreateTicket(safeUserSession.userId, placeId, ipAddress);
         var encodedTicket = HttpUtility.UrlEncode(ticket);
         var args = $"--authenticationUrl {Roblox.Configuration.BaseUrl}/Login/Negotiate.ashx --authenticationTicket {ticket} --joinScriptUrl {Configuration.BaseUrl}/placelauncher.ashx?ticket={encodedTicket}";
         return new { joinScriptUrl = Configuration.BaseUrl + "/placelauncher.ashx?ticket=" + encodedTicket, retroArgs = args };
@@ -316,6 +316,23 @@ public class WebController : ControllerBase
         } finally { lock (pendingAssetUploadsMux) { pendingAssetUploads--; } }
     }
     
+    /// <summary>
+    /// Locate an XML template by name, ignoring case. The repo ships lowercase template files and
+    /// this may run on a case-sensitive filesystem.
+    /// </summary>
+    private static string? FindXmlTemplate(string templateName)
+    {
+        var dir = Roblox.Configuration.XmlTemplatesDirectory;
+        if (string.IsNullOrWhiteSpace(dir) || !System.IO.Directory.Exists(dir)) return null;
+        var expected = templateName + ".xml";
+        foreach (var file in System.IO.Directory.GetFiles(dir))
+        {
+            if (string.Equals(System.IO.Path.GetFileName(file), expected, StringComparison.OrdinalIgnoreCase))
+                return file;
+        }
+        return null;
+    }
+
     [HttpPost("develop/upload")]
     public async Task<CreateResponse> UploadItem([Required, FromForm] UploadAssetRequest request)
     {
@@ -343,74 +360,85 @@ public class WebController : ControllerBase
         {
             if (isClothing)
             {
-                // 1. Read file into byte array to avoid stream position issues
+                // 1. Read the upload into a byte[] up-front. The stream gets consumed by validation,
+                //    hashing and the DB writes, so keep one copy in memory.
                 byte[] fileBytes;
                 using (var ms = new MemoryStream())
                 {
                     await request.file.CopyToAsync(ms);
                     fileBytes = ms.ToArray();
                 }
-                
+
                 using var stream = new MemoryStream(fileBytes);
                 var pictureData = await services.assets.ValidateClothing(stream, request.assetType);
                 if (pictureData == null) throw new BadRequestException(0, "Invalid image file");
-                
-                // 2. Generate hash for filename
+
                 stream.Position = 0;
                 string imageHash = await services.assets.GenerateImageHash(stream);
-                
-                // HARDCODED PATH TO FORCE SAVE
-                string assetDir = "C:\\Users\\losin\\Desktop\\ecsrev-main\\services\\api\\storage\\asset";
-                
-                if (!System.IO.Directory.Exists(assetDir)) System.IO.Directory.CreateDirectory(assetDir);
-                
-                string imagePath = System.IO.Path.Combine(assetDir, imageHash);
-                
-                // 3. Save raw image to disk manually
-                await System.IO.File.WriteAllBytesAsync(imagePath, fileBytes);
 
-                // 4. Create DB entry for the image asset
+                // 2. Hardcoded asset directory. Clothing uploads must land in the same folder the website
+                //    serves /asset/?id= from, otherwise RCC fails with "Temp read failed".
+                string assetDir = @"C:\Users\losin\Desktop\ecsrev-main\services\api\storage\asset";
+
+                if (!System.IO.Directory.Exists(assetDir))
+                    System.IO.Directory.CreateDirectory(assetDir);
+
+                var configuredAssetDir = (Roblox.Configuration.AssetDirectory ?? "").TrimEnd('\\', '/');
+                if (!configuredAssetDir.Equals(assetDir.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                    Console.WriteLine($"[warning] Directories:Asset is \"{Roblox.Configuration.AssetDirectory}\" but this upload writes to \"{assetDir}\". " +
+                                      "Point Directories:Asset at the same path or the renderer will not be able to read the file.");
+
+                // 3. Save the physical image. The filename is the SHA256 of the bytes, which is the same
+                //    key UploadAssetContent() uses, so the site can serve it with no extra work.
+                var imagePath = System.IO.Path.Combine(assetDir, imageHash);
+                await System.IO.File.WriteAllBytesAsync(imagePath, fileBytes);
+                Console.WriteLine($"[info] saved clothing image {imagePath} ({fileBytes.Length} bytes)");
+
+                // 4. Image asset DB entry
                 stream.Position = 0;
                 var imageAsset = await services.assets.CreateAsset(request.file.FileName, request.assetType + " Image",
                     userSession.userId, creatorType, creatorId, stream, Models.Assets.Type.Image,
                     Genre.All, ModerationStatus.ReviewApproved);
-                
+
                 await services.assets.InsertOrUpdateAssetVersionMetadataImage(imageAsset.assetVersionId, fileBytes.Length,
                     pictureData.width, pictureData.height, pictureData.imageFormat, imageHash);
-                
-                // 5. Create DB entry for the clothing item
-                var asset = await services.assets.CreateAsset(request.name, null, userSession.userId, creatorType, creatorId, null, request.assetType, Genre.All, imageAsset.moderationStatus, default, default, default, default, imageAsset.assetId);
-                
-                // 6. Save XML to disk manually
+
+                // 5. Clothing asset DB entry. contentId points at the image asset above.
+                var asset = await services.assets.CreateAsset(request.name, null, userSession.userId, creatorType, creatorId,
+                    null, request.assetType, Genre.All, imageAsset.moderationStatus, default, default, default, default, imageAsset.assetId);
+
+                // 6. Save the clothing XML next to the image, built from the matching template.
                 try
                 {
-                    string xmlFileName = request.assetType switch
+                    var templateName = request.assetType switch
                     {
-                        Models.Assets.Type.Shirt => "Shirt.xml",
-                        Models.Assets.Type.TeeShirt => "TeeShirt.xml",
-                        _ => "Pants.xml"
+                        Models.Assets.Type.Shirt => "shirt",
+                        Models.Assets.Type.TeeShirt => "teeshirt",
+                        _ => "pants",
                     };
 
-                    string xmlTemplateDir = Roblox.Configuration.XmlTemplatesDirectory;
-                    string xmlPath = System.IO.Path.Combine(xmlTemplateDir, xmlFileName);
-                    
-                    if (System.IO.File.Exists(xmlPath))
+                    var templatePath = FindXmlTemplate(templateName);
+                    if (templatePath == null)
                     {
-                        string xmlContent = await System.IO.File.ReadAllTextAsync(xmlPath);
-                        xmlContent = xmlContent.Replace("{assetId}", imageAsset.assetId.ToString());
-                        string outPath = System.IO.Path.Combine(assetDir, asset.assetId.ToString());
-                        await System.IO.File.WriteAllTextAsync(outPath, xmlContent);
+                        Console.WriteLine($"[warning] XML template {templateName}.xml was not found in \"{Roblox.Configuration.XmlTemplatesDirectory}\"");
                     }
                     else
                     {
-                        Console.WriteLine($"[warning] XML template not found: {xmlPath}");
+                        var xml = await System.IO.File.ReadAllTextAsync(templatePath);
+                        xml = xml.Replace("{assetId}", imageAsset.assetId.ToString());
+                        // RCC's TrustCheck rejects "localhost", so the texture URL must use the loopback IP.
+                        xml = xml.Replace("//localhost", "//127.0.0.1");
+
+                        var xmlPath = System.IO.Path.Combine(assetDir, asset.assetId.ToString());
+                        await System.IO.File.WriteAllTextAsync(xmlPath, xml);
+                        Console.WriteLine($"[info] saved clothing xml {xmlPath}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[error] Failed to write XML: {ex.Message}");
+                    Console.WriteLine($"[error] failed to write clothing xml: {ex.Message}");
                 }
-                
+
                 await services.users.CreateUserAsset(userSession.userId, asset.assetId);
                 return asset;
             }

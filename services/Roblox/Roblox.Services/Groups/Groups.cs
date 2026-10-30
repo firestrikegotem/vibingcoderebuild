@@ -1042,7 +1042,7 @@ public class GroupsService : ServiceBase, IService
         if (status.isLocked)
             throw new ArgumentException("You cannot join a closed group");
         if (!status.publicEntryAllowed)
-            throw new NotImplementedException("TODO: non-public entry groups");
+            throw new RobloxException(400, 0, "This group is invite only. You need to be invited by a group admin to join.");
         
         await using var joinGroupLock = await Cache.redLock.CreateLockAsync("JoinGroup:" + userId, TimeSpan.FromMinutes(2));
         await InTransaction(async _ =>

@@ -219,7 +219,7 @@ public class EconomyService : ServiceBase, IService
         }
         else
         {
-            throw new NotImplementedException();
+            throw new ArgumentException("Unsupported currency type: " + currency);
         }
 
         if (newBalance < 0)
@@ -268,7 +268,7 @@ public class EconomyService : ServiceBase, IService
         }
         else
         {
-            throw new NotImplementedException();
+            throw new ArgumentException("Unsupported currency type: " + currency);
         }
         
         if (newBalance < 0)

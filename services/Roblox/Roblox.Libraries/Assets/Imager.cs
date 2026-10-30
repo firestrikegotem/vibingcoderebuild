@@ -33,8 +33,8 @@ public class Imager
     public int width { get; private set; } = 0;
     public ImagerFormat imageFormat { get; private set; } = ImagerFormat.Undefined;
     
-    private Image image { get; set; }
-    private IImageFormat format { get; set; }
+    private Image image { get; set; } = null!;
+    private IImageFormat format { get; set; } = null!;
     
     private Imager(Stream content)
     {

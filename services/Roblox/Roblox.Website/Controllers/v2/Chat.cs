@@ -32,24 +32,30 @@ public class ChatControllerV2 : ControllerBase
     }
 
     [HttpGet("get-unread-conversation-count")]
-    public dynamic GetUnreadConversationCount()
+    public async Task<dynamic> GetUnreadConversationCount()
     {
-        // todo
-        throw new NotImplementedException();
+        if (!FeatureFlags.IsEnabled(FeatureFlag.WebsiteChat))
+        {
+            return new
+            {
+                count = 0,
+            };
+        }
+        var count = await services.chat.CountUnreadConversations(safeUserSession.userId);
         return new
         {
-            count = 0,
+            count = count,
         };
     }
 
     [HttpGet("chat-settings")]
-    public async Task<dynamic> GetChatSettings()
+    public Task<dynamic> GetChatSettings()
     {
-        return new
+        return Task.FromResult<dynamic>(new
         {
             chatEnabled = FeatureFlags.IsEnabled(FeatureFlag.WebsiteChat),
             isActiveChatUser = true, // todo
-        };
+        });
     }
 
     [HttpGet("get-user-conversations")]

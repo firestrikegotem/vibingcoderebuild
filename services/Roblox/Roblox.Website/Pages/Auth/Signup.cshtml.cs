@@ -27,6 +27,14 @@ public class Signup : RobloxPageModel
     public string username { get; set; }
     [BindProperty]
     public string password { get; set; }
+    [BindProperty]
+    public string? gender { get; set; }
+    [BindProperty]
+    public int? birthMonth { get; set; }
+    [BindProperty]
+    public int? birthDay { get; set; }
+    [BindProperty]
+    public int? birthYear { get; set; }
     [BindProperty(SupportsGet = true)]
     public string? applicationId { get; set; }
     [BindProperty(SupportsGet = true)]
@@ -110,12 +118,8 @@ public class Signup : RobloxPageModel
         FeatureFlags.FeatureCheck(FeatureFlag.SignupEnabled);
         var ip = ControllerBase.GetIP(ControllerBase.GetRequesterIpRaw(HttpContext));
 
-        try
-        {
-            // Initial cooldown check - to prevent people spamming attempts
-            await services.cooldown.CooldownCheck($"signup:step1:" + ip, TimeSpan.FromSeconds(5));
-        }
-        catch (CooldownException)
+        // Initial cooldown check - to prevent people spamming attempts
+        if (!await services.cooldown.TryCooldownCheck($"signup:step1:" + ip, TimeSpan.FromSeconds(5)))
         {
             Writer.Info(LogGroup.SignUp, "Sign up failed, cooldown step 1");
             errorMessage = "Too many attempts. Try again in about 5 seconds.";
@@ -191,6 +195,34 @@ public class Signup : RobloxPageModel
             return new PageResult();
         }
 
+        // Birthday is part of the 2016 sign up layout. There is no birthday column on the users
+        // table and the upstream signup API deliberately ignores it (SignUpRequest.birthday is
+        // marked obsolete), so the date is validated for a complete form but is not persisted.
+        if (birthMonth == null || birthDay == null || birthYear == null)
+        {
+            errorMessage = "Please enter your birthday.";
+            return Page();
+        }
+
+        var birthdayValid = birthMonth is >= 1 and <= 12 && birthYear is >= 1900 and <= 2100 && birthDay is >= 1 and <= 31;
+        if (birthdayValid)
+        {
+            try
+            {
+                _ = new DateTime(birthYear!.Value, birthMonth!.Value, birthDay!.Value);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                birthdayValid = false;
+            }
+        }
+
+        if (!birthdayValid)
+        {
+            errorMessage = "Please enter a valid birthday.";
+            return Page();
+        }
+
         var usernameValid = await services.users.IsUsernameValid(username);
         if (!usernameValid)
         {
@@ -220,14 +252,25 @@ public class Signup : RobloxPageModel
         
         // Created user, so add final cooldown
         var signupFinalKey = "signup:step2:" + ip;
-        try
-        {
-            await services.cooldown.CooldownCheck(signupFinalKey, TimeSpan.FromMinutes(5));
-        }
-        catch (CooldownException)
+        if (!await services.cooldown.TryCooldownCheck(signupFinalKey, TimeSpan.FromMinutes(5)))
         {
             errorMessage = "Too many attempts. Try again in about 5 minutes.";
             return new PageResult();
+        }
+
+        // Optional gender selection from the sign up form
+        var selectedGender = Gender.Unknown;
+        if (!string.IsNullOrWhiteSpace(gender))
+        {
+            if (gender.Equals("male", StringComparison.OrdinalIgnoreCase))
+                selectedGender = Gender.Male;
+            else if (gender.Equals("female", StringComparison.OrdinalIgnoreCase))
+                selectedGender = Gender.Female;
+            else if (!gender.Equals("unknown", StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "Invalid gender selection.";
+                return Page();
+            }
         }
 
         // Now make the account
@@ -235,7 +278,7 @@ public class Signup : RobloxPageModel
         try
         {
             createdUser =
-                await services.users.CreateUser(username, password, Gender.Unknown);
+                await services.users.CreateUser(username, password, selectedGender);
         }
         catch (Exception)
         {
@@ -246,13 +289,13 @@ public class Signup : RobloxPageModel
         if (method == SignupMethod.Application)
         {
             // Application
-            await services.users.SetApplicationUserIdByJoinId(applicationId, createdUser.userId);
+            await services.users.SetApplicationUserIdByJoinId(applicationId!, createdUser.userId);
             Roblox.Metrics.UserMetrics.ReportUserSignUpFromApplication();
         }
         else if (method == SignupMethod.InviteUrl)
         {
             // Invite
-            await services.users.SetUserInviteId(createdUser.userId, inviteId);
+            await services.users.SetUserInviteId(createdUser.userId, inviteId!);
             Roblox.Metrics.UserMetrics.ReportUserSignUpFromInvite();
         }
 

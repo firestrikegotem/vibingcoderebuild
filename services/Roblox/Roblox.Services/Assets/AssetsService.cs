@@ -558,6 +558,30 @@ public class AssetsService : ServiceBase, IService
             ModerationStatus.AwaitingApproval);
     }
 
+    /// <summary>
+    /// Catalog thumbnail for Shirt/Pants. The dedicated clothing renderer (scripts/asset/image.lua)
+    /// puts the texture on a 3D dummy and knows how to fetch the asset from this website; the older
+    /// path rendered a full avatar for a fake user id, which produced a blank dummy whenever the
+    /// renderer could not resolve the asset. Fall back to the avatar render if that fails.
+    /// </summary>
+    private async Task CreateClothingThumbnailV2(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
+    {
+        var latestVersion = await GetLatestAssetVersion(assetId);
+        try
+        {
+            var response = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int)assetType, cancellationToken);
+            var key = await UploadAssetContent(response, Configuration.ThumbnailsDirectory, "png");
+            await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, key, ModerationStatus.AwaitingApproval);
+            return;
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetRender, "clothing render failed for asset {0} (type {1}), falling back to avatar render: {2}", assetId, (int)assetType, e.Message);
+        }
+
+        await CreateClothingThumbnail(assetId, assetType, cancellationToken);
+    }
+
     private async Task CreateRawImageThumbnail(long assetId, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
@@ -684,7 +708,7 @@ public class AssetsService : ServiceBase, IService
     /// <param name="assetType"></param>
     /// <param name="cancellationToken">The CancellationToken</param>
     /// <exception cref="Exception"></exception>
-    public async Task RenderAssetAsync(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
+    public Task RenderAssetAsync(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
     {
         List<Task> thumbRequests = new();
         switch (assetType)
@@ -697,7 +721,7 @@ public class AssetsService : ServiceBase, IService
             // clothing
             case Models.Assets.Type.Shirt:
             case Models.Assets.Type.Pants:
-                 thumbRequests.Add(CreateClothingThumbnail(assetId, assetType, cancellationToken));
+                 thumbRequests.Add(CreateClothingThumbnailV2(assetId, assetType, cancellationToken));
                  break;
             // package stuff
             case Type.Head:
@@ -761,7 +785,7 @@ public class AssetsService : ServiceBase, IService
         }
 
         if (thumbRequests.Count == 0)
-            return;
+            return Task.CompletedTask;
 
         try
         {
@@ -773,6 +797,8 @@ public class AssetsService : ServiceBase, IService
         {
             Console.WriteLine("[error] Render failed for {0}:{1}: {2}", assetId, assetType, e.Message);
         }
+
+        return Task.CompletedTask;
     }
 
     public void RenderAsset(long assetId, Models.Assets.Type assetType)
@@ -1429,7 +1455,7 @@ WHERE asset_type = :asset_type AND asset.id < :id AND NOT asset.is_18_plus ORDER
             }
             else
             {
-                var otherType = GetTypeFromPluralString(request.subcategory);
+                var otherType = GetTypeFromPluralString(request.subcategory!);
                 if (otherType != null)
                 {
                     builder.Where($"asset.asset_type = {(int) otherType}");
@@ -1661,8 +1687,6 @@ WHERE asset_type = :asset_type AND asset.id < :id AND NOT asset.is_18_plus ORDER
             default:
                 throw new Exception("Unsupported creatorType: " + details.creatorType);
         }
-
-        return false;
     }
 
     public async Task<IEnumerable<CreationEntry>> GetCreations(CreatorType creatorType, long creatorId,

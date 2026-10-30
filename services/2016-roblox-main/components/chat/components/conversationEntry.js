@@ -114,7 +114,7 @@ const ChatHistory = props => {
                   <div className={historyStyles.messageOtherHeadshot}>
                     <div className={entryStyles.chatHeadshot}>
                       <div className={entryStyles.chatHeadshotImage}>
-                        <PlayerHeadshot id={v.data.senderTargetId} name={'Roblox User'} />
+                        <PlayerHeadshot id={v.data.senderTargetId} name={'Bloxyn User'} />
                       </div>
                     </div>
                   </div>

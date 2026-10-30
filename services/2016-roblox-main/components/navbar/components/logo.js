@@ -5,7 +5,7 @@ const useLogoStyles = createUseStyles({
   imgDesktop: {
     width: '118px',
     height: '30px',
-    backgroundImage: `url(/img/roblox_logo.svg)`,
+    backgroundImage: `url(/img/bloxyn_logo.png)`,
     backgroundSize: '118px 30px',
     display: 'none',
     '@media(min-width: 1301px)': {
@@ -13,11 +13,13 @@ const useLogoStyles = createUseStyles({
     },
   },
   imgMobile: {
-    backgroundImage: `url(/img/logo_R.svg)`,
-    width: '30px',
-    height: '30px',
+    backgroundImage: `url(/img/bloxyn_logo_sm.png)`,
+    width: '88px',
+    height: '23px',
     display: 'block',
-    backgroundSize: '30px',
+    backgroundSize: '88px 23px',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'left center',
     '@media(min-width: 1301px)': {
       display: 'none',
     },

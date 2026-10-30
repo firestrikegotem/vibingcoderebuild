@@ -20,6 +20,21 @@ public class RobloxPageModel : PageModel
     }
 
     public bool isAuthenticated => userSession != null;
+
+    /// <summary>
+    /// Same as userSession but throws "Unauthorized" instead of returning null when the visitor
+    /// is not logged in. Mirrors ControllerBase.safeUserSession.
+    /// </summary>
+    /// <exception cref="RobloxException"></exception>
+    protected UserSession safeUserSession
+    {
+        get
+        {
+            if (userSession == null)
+                throw new Roblox.Services.Exceptions.RobloxException(401, 0, "Unauthorized");
+            return userSession;
+        }
+    }
     protected string rawIpAddress => Roblox.Website.Controllers.ControllerBase.GetRequesterIpRaw(HttpContext);
     protected string hashedIp => Roblox.Website.Controllers.ControllerBase.GetIP(rawIpAddress);
 

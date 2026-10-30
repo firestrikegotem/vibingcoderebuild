@@ -19,7 +19,7 @@ public class GroupsServiceIntegrationTest : TestBase
         Assert.NotNull(groupData.name);
         Assert.NotNull(groupData.description);
         Assert.NotNull(groupData.owner);
-        Assert.Equal(userOne, groupData.owner.userId);
+        Assert.Equal(userOne, groupData.owner!.userId);
         Assert.True(groupData.publicEntryAllowed);
         Assert.False(groupData.isLocked);
         Assert.False(groupData.isBuildersClubOnly);
@@ -72,7 +72,7 @@ public class GroupsServiceIntegrationTest : TestBase
         // new guy should be owner
         groupData = await gs.GetGroupById(groupOne);
         Assert.NotNull(groupData.owner);
-        Assert.Equal(userTwo, groupData.owner.userId);
+        Assert.Equal(userTwo, groupData.owner!.userId);
     }
 
 }

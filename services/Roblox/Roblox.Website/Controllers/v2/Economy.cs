@@ -145,7 +145,7 @@ public class EconomyControllerV2 : ControllerBase
                 }
                 else if (c.subType is TransactionSubType.GroupPayoutReceived)
                 {
-                    details = null;
+                    details = null!;
                     typeOverride = "Group Revenue Payout";
                 }
                 else

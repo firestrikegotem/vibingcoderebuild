@@ -7,6 +7,7 @@ using Roblox.Services;
 using Roblox.Services.IntegrationTest;
 using Roblox.Website.Controllers;
 using Xunit;
+using Roblox.Models.Assets;
 
 public class AssetPurchaseTest : TestBase
 {
@@ -17,8 +18,8 @@ public class AssetPurchaseTest : TestBase
         var creator = await CreateRandomUser();
         var item = await CreateRandomItem(creator);
         var assets = new AssetsService();
-        await assets.UpdateAssetMarketInfo(item, true, false, false,
-            null, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: true, isLimited: false, isLimitedUnique: false,
+            maxCopies: null, offsaleDeadline: null);
         await assets.SetItemPrice(item, 10, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyer);
         await economyController.PurchaseAsset(item, new PurchaseRequest()
@@ -35,7 +36,7 @@ public class AssetPurchaseTest : TestBase
         Assert.Equal(107, balTwo);
         // confirm transaction exists
         var usersService = new UsersService();
-        var trans = await economy.GetTransactions(buyer, PurchaseType.Purchase, 1, 0);
+        var trans = await economy.GetTransactions(buyer, CreatorType.User, PurchaseType.Purchase, 1, 0);
         var realTrans = trans.ToList();
         Assert.Single(realTrans);
         Assert.Equal(10, realTrans[0].amount);
@@ -44,7 +45,7 @@ public class AssetPurchaseTest : TestBase
         Assert.Equal(creator, realTrans[0].userIdTwo);
         Assert.Null(realTrans[0].groupIdTwo);
         // confirm trans exists for seller too
-        var sellerTrans = (await economy.GetTransactions(creator, PurchaseType.Sale, 1, 0)).ToList();
+        var sellerTrans = (await economy.GetTransactions(creator, CreatorType.User, PurchaseType.Sale, 1, 0)).ToList();
         Assert.Single(sellerTrans);
         Assert.Equal(7, sellerTrans[0].amount);
         Assert.Equal(buyer, sellerTrans[0].userIdTwo);
@@ -72,8 +73,8 @@ public class AssetPurchaseTest : TestBase
         Assert.Equal(100, creatorBalAtStart);
         var assets = new AssetsService();
         // Max copies of 2
-        await assets.UpdateAssetMarketInfo(item, true, true, true, 
-            2, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: true, isLimited: true, isLimitedUnique: true,
+            maxCopies: 2, offsaleDeadline: null);
         await assets.SetItemPrice(item, 10, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyerOne);
         // Buyer one purchase, gets serial 1
@@ -91,7 +92,7 @@ public class AssetPurchaseTest : TestBase
         var balTwo = await economyService.GetUserRobux(creator);
         Assert.Equal(107, balTwo);
         // confirm transaction exists
-        var trans = await economyService.GetTransactions(buyerOne, PurchaseType.Purchase, 1, 0);
+        var trans = await economyService.GetTransactions(buyerOne, CreatorType.User, PurchaseType.Purchase, 1, 0);
         var realTrans = trans.ToList();
         Assert.Single(realTrans);
         Assert.Equal(10, realTrans[0].amount);
@@ -99,7 +100,7 @@ public class AssetPurchaseTest : TestBase
         Assert.Equal(item, realTrans[0].assetId);
         Assert.Equal(creator, realTrans[0].userIdTwo);
         // confirm trans exists for seller too
-        var sellerTrans = (await economyService.GetTransactions(creator, PurchaseType.Sale, 1, 0)).ToList();
+        var sellerTrans = (await economyService.GetTransactions(creator, CreatorType.User, PurchaseType.Sale, 1, 0)).ToList();
         Assert.Single(sellerTrans);
         Assert.Equal(7, sellerTrans[0].amount);
         Assert.Equal(buyerOne, sellerTrans[0].userIdTwo);
@@ -144,8 +145,8 @@ public class AssetPurchaseTest : TestBase
         var assets = new AssetsService();
         using var us = ServiceProvider.GetOrCreate<UsersService>();
         // Max copies of 1
-        await assets.UpdateAssetMarketInfo(item, true, true, true, 
-            1, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: true, isLimited: true, isLimitedUnique: true,
+            maxCopies: 1, offsaleDeadline: null);
         await assets.SetItemPrice(item, 10, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyerOne);
         // Buyer one purchase, gets serial 1
@@ -159,7 +160,7 @@ public class AssetPurchaseTest : TestBase
         Assert.NotNull(copies);
         // Item can now be re-sold.
         // Set the price
-        await economyController.SetPriceOfUserAsset(item, copies.userAssetId, new SetPriceRequest()
+        await economyController.SetPriceOfUserAsset(item, copies!.userAssetId, new SetPriceRequest()
         {
             price = 100,
         });
@@ -195,7 +196,7 @@ public class AssetPurchaseTest : TestBase
         var balTwo = await economyService.GetUserRobux(buyerTwo);
         Assert.Equal(0, balTwo); // starts with 100. should be 0 because bought item for 100
         // confirm transaction exists
-        var trans = await economyService.GetTransactions(buyerTwo, PurchaseType.Purchase, 1, 0);
+        var trans = await economyService.GetTransactions(buyerTwo, CreatorType.User, PurchaseType.Purchase, 1, 0);
         var realTrans = trans.ToList();
         Assert.Single(realTrans);
         Assert.Equal(100, realTrans[0].amount);
@@ -205,7 +206,7 @@ public class AssetPurchaseTest : TestBase
         Assert.Equal(buyerOne, realTrans[0].userIdTwo);
         
         // confirm trans exists for seller too
-        var sellerTrans = (await economyService.GetTransactions(buyerOne, PurchaseType.Sale, 1, 0)).ToList();
+        var sellerTrans = (await economyService.GetTransactions(buyerOne, CreatorType.User, PurchaseType.Sale, 1, 0)).ToList();
         Assert.Single(sellerTrans);
         Assert.Equal(amountSellerShouldGet, sellerTrans[0].amount);
         Assert.Equal(buyerTwo, sellerTrans[0].userIdTwo);
@@ -223,9 +224,9 @@ public class AssetPurchaseTest : TestBase
         var balTwo = await economyService.GetUserRobux(sellerId);
         Assert.Equal(100, balTwo);
         // confirm transactions were not created
-        var buyerTrans = (await economyService.GetTransactions(buyerId, PurchaseType.Purchase, 100, 0));
+        var buyerTrans = (await economyService.GetTransactions(buyerId, CreatorType.User, PurchaseType.Purchase, 100, 0));
         Assert.Empty(buyerTrans);
-        var sellerTrans = await economyService.GetTransactions(sellerId, PurchaseType.Sale, 100, 0);
+        var sellerTrans = await economyService.GetTransactions(sellerId, CreatorType.User, PurchaseType.Sale, 100, 0);
         Assert.Empty(sellerTrans);
     }
     
@@ -236,8 +237,9 @@ public class AssetPurchaseTest : TestBase
         var creator = await CreateRandomUser();
         var item = await CreateRandomItem(creator);
         var assets = new AssetsService();
-        await assets.UpdateAssetMarketInfo(item, true, false, false, 1000, 
-            null, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: true, isLimited: false, isLimitedUnique: false,
+            maxCopies: null, offsaleDeadline: null);
+        await assets.SetItemPrice(item, 1000, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyer);
         await Assert.ThrowsAsync<BadRequestException>(async () =>
         {
@@ -258,8 +260,9 @@ public class AssetPurchaseTest : TestBase
         var creator = await CreateRandomUser();
         var item = await CreateRandomItem(creator);
         var assets = new AssetsService();
-        await assets.UpdateAssetMarketInfo(item, false, false, false, 1000, 
-            null, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: false, isLimited: false, isLimitedUnique: false,
+            maxCopies: null, offsaleDeadline: null);
+        await assets.SetItemPrice(item, 1000, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyer);
         // price is correct but item is not for sale
         await Assert.ThrowsAsync<BadRequestException>(async () =>
@@ -281,8 +284,9 @@ public class AssetPurchaseTest : TestBase
         var creator = await CreateRandomUser();
         var item = await CreateRandomItem(creator);
         var assets = new AssetsService();
-        await assets.UpdateAssetMarketInfo(item, true, false, false, 100, 
-            null, null);
+        await assets.UpdateAssetMarketInfo(item, isForSale: true, isLimited: false, isLimitedUnique: false,
+            maxCopies: null, offsaleDeadline: null);
+        await assets.SetItemPrice(item, 100, null);
         var economyController = ControllerAuth<EconomyControllerV1>(buyer);
         // price is incorrect
         await Assert.ThrowsAsync<BadRequestException>(async () =>

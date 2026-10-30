@@ -1,7 +1,7 @@
 import '../styles/globals.css';
 import '../styles/helpers/textHelpers.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-// Roblox CSS
+// Bloxyn CSS
 import '../styles/roblox/icons.css';
 import Navbar from '../components/navbar';
 import React, {useEffect, useState} from 'react';
@@ -60,7 +60,7 @@ function RobloxApp({ Component, pageProps }) {
     <Head>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin={''} />
-      <title>{pageProps.title || 'ROBLOX'}</title>
+      <title>{pageProps.title || 'BLOXYN'}</title>
       <link rel='icon' type="image/vnd.microsoft.icon" href='/favicon.ico' />
       <meta name='viewport' content='width=device-width, initial-scale=1' />
     </Head>

@@ -60,9 +60,9 @@ public class ApisController : ControllerBase
     }
     
     [HttpGet("universal-app-configuration/v1/behaviors/group-details-ui/content")]
-    public async Task<dynamic> GetGroupConfig()
+    public Task<dynamic> GetGroupConfig()
     {
-        return new
+        return Task.FromResult<dynamic>(new
         {
             displayShout = true,
             displayDescription = true,
@@ -70,7 +70,7 @@ public class ApisController : ControllerBase
             displayWall = true,
             displayRank = true,
             checkGroupOrigin = false
-        };
+        });
     }
 
     [HttpGet("universal-app-configuration/v1/behaviors/configure-group-ui/content")]

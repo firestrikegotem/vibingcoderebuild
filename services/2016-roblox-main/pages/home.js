@@ -14,7 +14,7 @@ export default function AuthenticatedHomePage() {
 export const getStaticProps = () => {
   return {
     props: {
-      title: 'Home - ROBLOX',
+      title: 'Home - BLOXYN',
     },
   }
 }

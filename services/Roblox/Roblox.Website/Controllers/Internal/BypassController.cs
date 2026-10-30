@@ -231,7 +231,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""ShirtGraphic"" referent=""RBX0"">
         <Properties>
-            <Content name=""Graphic""><url>http://localhost:5000/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""Graphic""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">T-Shirt</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -245,7 +245,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""Shirt"" referent=""RBX0"">
         <Properties>
-            <Content name=""ShirtTemplate""><url>http://localhost:5000/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""ShirtTemplate""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">Shirt</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -259,7 +259,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""Pants"" referent=""RBX0"">
         <Properties>
-            <Content name=""PantsTemplate""><url>http://localhost:5000/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""PantsTemplate""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">Pants</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -417,7 +417,8 @@ namespace Roblox.Website.Controllers
                 return has.Any() ? "True" : "False";
             }
 
-            throw new NotImplementedException();
+            // Any other action means "the user does not own this pass"
+            return "False";
         }
 
         [HttpGet("Game/LuaWebService/HandleSocialRequest.ashx")]
@@ -483,18 +484,17 @@ namespace Roblox.Website.Controllers
 
             }
 
-            if (method == "isbestfriendswith")
-            {
-                return "<Value Type\"boolean\">False</value>";
-            }
-
-            throw new NotImplementedException();
+            // There is no best-friend concept on this site. The 2016 client asks about it
+            // (and about a few other social methods) from in-game scripts, so answer False
+            // instead of throwing a 500 that breaks the client's social features.
+            return "<Value Type=\"boolean\">False</Value>";
         }
 
         [HttpGet("login/negotiate.ashx"), HttpGet("login/negotiateasync.ashx")]
-        public async Task Negotiate([Required, MVC.FromQuery] string suggest)
+        public Task Negotiate([Required, MVC.FromQuery] string suggest)
         {
             var domain = Request.Headers["rbxauthenticationnegotiation"].FirstOrDefault();
+            return Task.CompletedTask;
         }
 
         [HttpGet("/auth/submit")]
@@ -537,16 +537,16 @@ namespace Roblox.Website.Controllers
         public static long startUserId {get;set;} = 30;
 #if DEBUG
         [HttpGetBypass("/game/get-join-script-debug")]
-        public async Task<dynamic> GetJoinScriptDebug(long placeId, long userId = 12)
+        public Task<dynamic> GetJoinScriptDebug(long placeId, long userId = 12)
         {
             //startUserId = 12;
             var result = services.gameServer.CreateTicket(startUserId, placeId, GetIP());
             startUserId++;
-            return new
+            return Task.FromResult<dynamic>(new
             {
                 placeLauncher = $"{Configuration.BaseUrl}/placelauncher.ashx?ticket={HttpUtility.UrlEncode(result)}",
                 authenticationTicket = result,
-            };
+            });
         }
 #endif
 
@@ -699,10 +699,11 @@ namespace Roblox.Website.Controllers
         [MVC.HttpPost("/Game/ValidateTicket.ashx")]
         public async Task<string> ValidateClientTicketRcc([Required, MVC.FromBody] ValidateTicketRequest request)
         {
+            // the debug build short circuits below, so keep an explicit no-op await
+            await Task.CompletedTask;
 #if DEBUG
             return "true";
-#endif
-            
+#else
             try
             {
                 // Below is intentionally caught by local try/catch. RCC could crash if we give a 500 error.
@@ -757,6 +758,7 @@ namespace Roblox.Website.Controllers
                 Console.WriteLine("[error] Verify ticket failed. Error = {0}\n{1}", e.Message, e.StackTrace);
                 return "false";
             }
+#endif
         }
 
         [MVC.HttpPost("/game/validate-machine")]
@@ -778,6 +780,8 @@ namespace Roblox.Website.Controllers
         [HttpGetBypass("Users/GetBanStatus.ashx")]
         public async Task<IEnumerable<dynamic>> MultiGetBanStatus(string userIds)
         {
+            // The DEBUG build short circuits below; keep the signature async in both builds.
+            await Task.CompletedTask;
 
             var ids = userIds.Split(",").Select(long.Parse).Distinct();
             var result = new List<dynamic>();
@@ -963,21 +967,21 @@ namespace Roblox.Website.Controllers
         }
 
         [HttpPostBypass("persistence/increment")]
-        public async Task<dynamic> IncrementPersistence(long placeId, string key, string type, string scope, string target, int value)
+        public Task<dynamic> IncrementPersistence(long placeId, string key, string type, string scope, string target, int value)
         {
             // increment?placeId=%i&key=%s&type=%s&scope=%s&target=&value=%i
             
             if (!IsRcc())
                 throw new RobloxException(400, 0, "BadRequest");
             
-            return new
+            return Task.FromResult<dynamic>(new
             {
                 data = (object?) null,
-            };
+            });
         }
 
         [HttpPostBypass("persistence/getSortedValues")]
-        public async Task<dynamic> GetSortedPersistenceValues(long placeId, string type, string scope, string key, int pageSize, bool ascending, int inclusiveMinValue = 0, int inclusiveMaxValue = 0)
+        public Task<dynamic> GetSortedPersistenceValues(long placeId, string type, string scope, string key, int pageSize, bool ascending, int inclusiveMinValue = 0, int inclusiveMaxValue = 0)
         {
             // persistence/getSortedValues?placeId=0&type=sorted&scope=global&key=Level%5FHighscores20&pageSize=10&ascending=False"
             // persistence/set?placeId=124921244&key=BF2%5Fds%5Ftest&&type=standard&scope=global&target=BF2%5Fds%5Fkey%5Ftmp&valueLength=31
@@ -985,14 +989,14 @@ namespace Roblox.Website.Controllers
             if (!IsRcc())
                 throw new RobloxException(400, 0, "BadRequest");
             
-            return new
+            return Task.FromResult<dynamic>(new
             {
                 data = new
                 {
                     Entries = ArraySegment<int>.Empty,
                     ExclusiveStartKey = (string?)null,
                 },
-            };
+            });
         }
 
         [HttpPostBypass("persistence/getv2")]
@@ -1028,6 +1032,7 @@ namespace Roblox.Website.Controllers
             foreach (var request in requests)
             {
                 var des = JsonSerializer.Deserialize<GetKeyScope>(request);
+                if (des == null) continue;
                 
                 var res = await ds.Get(placeId, type, des.scope ?? scope, des.key, des.target);
                 if (!string.IsNullOrWhiteSpace(res))

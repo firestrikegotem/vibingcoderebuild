@@ -49,7 +49,7 @@ const AccountInfo = props => {
       <Subtitle>Personal</Subtitle>
       <div className={cardStyles.card + ' p-3'}>
         <textarea ref={descRef} className={s.descInput} rows={3} defaultValue={store.description}></textarea>
-        <p className='mb-0 font-size-12'>Do not provide any details that can be used to identify you outside ROBLOX.</p>
+        <p className='mb-0 font-size-12'>Do not provide any details that can be used to identify you outside BLOXYN.</p>
         <div className='mt-1'>
           <div className='row'>
             <div className='col pe-0'>

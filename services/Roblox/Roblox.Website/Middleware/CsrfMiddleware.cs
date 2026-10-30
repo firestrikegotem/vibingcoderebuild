@@ -64,20 +64,20 @@ public class CsrfMiddleware : ControllerServicesExtended
         return result;
     }
 
-    public async Task<CsrfJwtEntry?> TryGetCookie(HttpContext ctx)
+    public Task<CsrfJwtEntry?> TryGetCookie(HttpContext ctx)
     {
         if (ctx.Request.Cookies.ContainsKey(CookieName))
         {
             var cookie = ctx.Request.Cookies[CookieName];
-            var decodedResult = DecodeJwt<CsrfJwtEntry>(cookie);
+            var decodedResult = DecodeJwt<CsrfJwtEntry>(cookie!);
             if (!string.IsNullOrEmpty(decodedResult.csrf) &&
                 decodedResult.createdAt.Add(TimeSpan.FromMinutes(5)) >= DateTime.UtcNow)
             {
-                return decodedResult;
+                return Task.FromResult<CsrfJwtEntry?>(decodedResult);
             }
         }
 
-        return null;
+        return Task.FromResult<CsrfJwtEntry?>(null);
     }
 
     public async Task OnTokenFail(HttpContext ctx)

@@ -87,6 +87,23 @@ const axiosClient = axiosStatic.create({
 	console.error('[error] could not fetch ip:',e);
 });
 
+/**
+ * The 2016 RCC build has a TrustCheck that refuses to fetch any URL containing "localhost",
+ * which makes every texture/asset download fail ("Temp read failed") and leaves clothing
+ * thumbnails as a grey mannequin. Every script we send to RCC therefore has its backend
+ * URLs rewritten to the raw loopback IP.
+ */
+const rccSafeBaseUrl = 'http://127.0.0.1:5000';
+
+const localizeScriptUrls = (script: string): string => {
+	return script
+		.replace(/https?:\/\/www\.economy-simulator\.org/g, rccSafeBaseUrl)
+		.replace(/https?:\/\/economy-simulator\.org/g, rccSafeBaseUrl)
+		.replace(/https?:\/\/localhost:5000/g, rccSafeBaseUrl)
+		// any leftover bare "localhost" (no explicit port), e.g. http://localhost/asset/
+		.replace(/https?:\/\/localhost(?![.\w])/g, 'http://127.0.0.1');
+};
+
 const maxRendersBeforeRestart = 100;
 
 interface IQueueEntry {
@@ -401,7 +418,8 @@ export default class CommandHandler extends StdExceptions {
 	}
 
 	private createSoapRequest(script: string, jobId: string): { request: string; jobId: string; createdAt: number; } {
-		const scriptToSend = script
+		// RCC must never see localhost in an asset URL, see localizeScriptUrls()
+		const scriptToSend = localizeScriptUrls(script)
 		.replace(/InsertJobIdHere/g, jobId);
 		const xml = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">

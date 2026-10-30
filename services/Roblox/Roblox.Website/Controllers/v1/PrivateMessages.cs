@@ -55,7 +55,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
     public async Task<dynamic> GetUnreadMessagesCount()
     {
         FeatureCheck();
-        var res = await services.privateMessages.CountUnreadMessages(userSession.userId);
+        var res = await services.privateMessages.CountUnreadMessages(safeUserSession.userId);
         return new
         {
             count = res,
@@ -66,7 +66,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
     public async Task<dynamic> SendMessage([Required,FromBody] SendMessageRequest request)
     {
         FeatureCheck();
-        if (await services.privateMessages.IsFloodChecked(userSession.userId))
+        if (await services.privateMessages.IsFloodChecked(safeUserSession.userId))
             return new
             {
                 success = false,
@@ -76,7 +76,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
         
         try
         {
-            await services.privateMessages.CreateMessage(request.recipientid, userSession.userId, request.subject,
+            await services.privateMessages.CreateMessage(request.recipientid, safeUserSession.userId, request.subject,
                 request.body, request.replyMessageId, request.includePreviousMessage);
         }
         catch (ArgumentException e)
@@ -103,7 +103,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
         foreach (var item in request.messageIds)
         {
             var info = await services.privateMessages.GetMessageById(item);
-            if (info.receiverId != userSession.userId)
+            if (info.receiverId != safeUserSession.userId)
                 throw new ArgumentException("Invalid messageId");
             await services.privateMessages.SetReadStatus(item, true);
         }
@@ -116,7 +116,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
         foreach (var item in request.messageIds)
         {
             var info = await services.privateMessages.GetMessageById(item);
-            if (info.receiverId != userSession.userId)
+            if (info.receiverId != safeUserSession.userId)
                 throw new ArgumentException("Invalid messageId");
             await services.privateMessages.SetReadStatus(item, false);
         }
@@ -129,7 +129,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
         foreach (var item in request.messageIds)
         {
             var info = await services.privateMessages.GetMessageById(item);
-            if (info.receiverId != userSession.userId)
+            if (info.receiverId != safeUserSession.userId)
                 throw new ArgumentException("Invalid messageId");
             await services.privateMessages.SetArchiveStatus(item, true);
         }
@@ -142,7 +142,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
         foreach (var item in request.messageIds)
         {
             var info = await services.privateMessages.GetMessageById(item);
-            if (info.receiverId != userSession.userId)
+            if (info.receiverId != safeUserSession.userId)
                 throw new ArgumentException("Invalid messageId");
             await services.privateMessages.SetArchiveStatus(item, false);
         }
@@ -153,7 +153,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
     {
         FeatureCheck();
         if (pageSize is > 100 or < 0) pageSize = 10;
-        return await services.privateMessages.GetMessages(userSession.userId, messageTab, pageSize,
+        return await services.privateMessages.GetMessages(safeUserSession.userId, messageTab, pageSize,
             pageSize * pageNumber);
     }
 
@@ -162,7 +162,7 @@ public class PrivateMessagesControllerV1 : ControllerBase
     {
         FeatureCheck();
         var msg = await services.privateMessages.GetMessageById(messageId);
-        if (msg.receiverId != userSession.userId && msg.senderId != userSession.userId)
+        if (msg.receiverId != safeUserSession.userId && msg.senderId != safeUserSession.userId)
         {
             throw new BadRequestException();
         }

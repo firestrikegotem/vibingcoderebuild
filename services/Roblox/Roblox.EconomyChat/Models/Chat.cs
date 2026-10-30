@@ -7,7 +7,7 @@ public class UnreadMessageCount
 
 public class ChatAuthor
 {
-    public string username { get; set; }
+    public string username { get; set; } = null!;
     public long userId { get; set; }
     public bool isAdmin { get; set; }
 }
@@ -15,8 +15,8 @@ public class ChatAuthor
 public class ChatMessage
 {
     public long messageId { get; set; }
-    public ChatAuthor author { get; set; }
-    public string content { get; set; }
+    public ChatAuthor author { get; set; } = null!;
+    public string content { get; set; } = null!;
     public DateTime createdAt { get; set; }
     public DateTime updatedAt { get; set; }
 }
@@ -33,6 +33,6 @@ public class ChannelChatMessage : ChatMessage
 
 public class CreateMessageRequest
 {
-    public string content { get; set; }
+    public string content { get; set; } = null!;
     public long channelId { get; set; }
 }

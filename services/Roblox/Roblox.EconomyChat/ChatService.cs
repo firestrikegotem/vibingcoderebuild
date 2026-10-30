@@ -19,7 +19,7 @@ public class ChatService : ServiceBase
     private static Dictionary<long, DateTime> lastReadDates { get; set; } = new();
     private static long lastMessageId { get; set; } = 1;
     private static Mutex messageUpdateMux = new Mutex();
-    private static DistributedCache redis => Roblox.Services.Cache.distributed;
+    private new static DistributedCache redis => Roblox.Services.Cache.distributed;
 
     private async Task PublishEvent<T>(T eventData) where T : IChatEvent
     {
@@ -40,22 +40,24 @@ public class ChatService : ServiceBase
         }));
     }
 
-    public async Task ToggleTyping(long contextUserId, long channelId, bool isTyping)
+    public Task ToggleTyping(long contextUserId, long channelId, bool isTyping)
     {
-        
+        return Task.CompletedTask;
     }
 
-    public async Task<IEnumerable<Roblox.EconomyChat.Models.ChannelChatMessage>> GetMessagesInChannel(long channelId, long startMessageId, int limit)
+    public Task<IEnumerable<Roblox.EconomyChat.Models.ChannelChatMessage>> GetMessagesInChannel(long channelId, long startMessageId, int limit)
     {
         if (!chatMessageDb.ContainsKey(channelId))
-            return Array.Empty<ChannelChatMessage>();
-        
-        return chatMessageDb[channelId].Where(v => v.messageId > startMessageId).Take(limit);
+            return Task.FromResult<IEnumerable<ChannelChatMessage>>(Array.Empty<ChannelChatMessage>());
+
+        return Task.FromResult<IEnumerable<ChannelChatMessage>>(chatMessageDb[channelId].Where(v => v.messageId > startMessageId).Take(limit));
     }
 
     public async Task<ChatMessage> CreateChannelMessage(long contextUserId, CreateMessageRequest request)
     {
         var channel = Channel.channels.Find(c => c.id == request.channelId);
+        if (channel == null)
+            throw new RobloxException(400, 0, "Unknown channel");
         if (contextUserId != 12 && (channel.isAdminRequiredForReading || channel.isAdminRequiredForWriting))
             throw new RobloxException(403, 0, "Forbidden");
 
@@ -91,20 +93,27 @@ public class ChatService : ServiceBase
         return msg;
     }
 
-    public async Task<UnreadMessageCount> GetUnreadMessageCount(long contextUserId, long channelId)
+    public Task<UnreadMessageCount> GetUnreadMessageCount(long contextUserId, long channelId)
     {
         // Default to current time so first time users don't have thousands of unread messages
         if (!lastReadDates.ContainsKey(contextUserId))
             lastReadDates[contextUserId] = DateTime.UtcNow;
+        if (!chatMessageDb.ContainsKey(channelId))
+            return Task.FromResult(new UnreadMessageCount()
+            {
+                unreadCount = 0,
+            });
         var unread = chatMessageDb[channelId].Count(c => c.createdAt > lastReadDates[contextUserId]);
-        return new UnreadMessageCount()
+        return Task.FromResult(new UnreadMessageCount()
         {
             unreadCount = unread,
-        };
+        });
     }
 
-    public async Task SetReadMessage(long contextUserId, long channelId)
+    public Task SetReadMessage(long contextUserId, long channelId)
     {
-        lastReadDates[channelId] = DateTime.UtcNow;
+        // lastReadDates is keyed by user id, not channel id
+        lastReadDates[contextUserId] = DateTime.UtcNow;
+        return Task.CompletedTask;
     }
 }

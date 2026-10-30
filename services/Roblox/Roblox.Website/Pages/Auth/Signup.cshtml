@@ -3,41 +3,119 @@
 
 @{
     Layout = "Shared/_Layout";
-    var htmlClassNames = "col-12 col-md-6 offset-md-3 col-lg-4 offset-lg-4";
+    var currentYear = DateTime.UtcNow.Year;
 }
-<div class="container mt-4">
-    <div class="row">
-        <div class="@htmlClassNames">
-            <div class="card card-body">
-                <h2>Sign Up</h2>
-                @if (Model.applicationId != null && Model.invite == null)
-                {
-                    <p>If you already have an account you'd like to reactivate, you can <a href="/auth/login?applicationId=@Model.applicationId">login here</a>.</p>
-                }
-                @if (Model.invite != null)
-                {
-                    <p>You have been invited to this website by <span class="fw-bolder">@Model.inviterUsername</span>.</p>
-                    <p>To sign up, just enter a username and password.</p>
-                    {
-                        // Password notice only applies to invited users. Application users can recover through matrix account.
-                    }
-                    <p><span class="fw-bolder text-danger">IMPORTANT PASSWORD NOTICE:</span> You cannot recover your password if you forget it. You should use a password manager such as <a href="https://1password.com/" rel="nofollow noopener noreferrer" target="_blank">1Password</a> or <a href="https://bitwarden.com/" rel="nofollow noopener noreferrer" target="_blank">Bitwarden</a>.</p>
-                }
-                else
-                {
-                    <p>To sign up, just enter a username and password.</p>
-                }
-                @if (Model.errorMessage != null)
-                {
-                    <p class="text-danger">@Model.errorMessage</p>
-                }
-                <form method="post">
-                    <input disabled="@Model.signupDisabled" type="text" placeholder="Username" name="username" class="form-control mb-1"/>
-                    <input disabled="@Model.signupDisabled" type="password" placeholder="Password" name="password" class="form-control mb-1"/>
-                    @Html.AntiForgeryToken()
-                    <input disabled="@Model.signupDisabled" class="btn btn-primary mt-2" type="submit" value="Sign Up" id="signup-submit"/>
-                </form>
+<partial name="_SignupStyles" />
+
+<div class="auths-wrap">
+    <partial name="_BloxynLogo" model='"bloxyn-logo-hero"' />
+
+    <div class="auths-card">
+        <h1 class="auths-title">Sign up and start having fun!</h1>
+
+        @if (Model.invite != null)
+        {
+            <p class="auths-note">
+                You have been invited to this website by <strong>@Model.inviterUsername</strong>. To sign up, just fill in the form below.
+            </p>
+            <p class="auths-warn">
+                <strong>Important password notice:</strong> you cannot recover your password if you forget it. Use a password manager such as
+                <a href="https://1password.com/" rel="nofollow noopener noreferrer" target="_blank">1Password</a> or
+                <a href="https://bitwarden.com/" rel="nofollow noopener noreferrer" target="_blank">Bitwarden</a>.
+            </p>
+        }
+
+        @if (Model.errorMessage != null)
+        {
+            <p class="auths-error">@Model.errorMessage</p>
+        }
+
+        <form method="post">
+            <div class="auths-field">
+                <label class="auths-label" for="signup-birth-month">Birthday</label>
+                <div class="auths-birthday">
+                    <select id="signup-birth-month" name="birthMonth" class="auths-select auths-birthday-month" disabled="@Model.signupDisabled">
+                        <option value="" selected="@(Model.birthMonth == null)">Month</option>
+                        @for (var month = 1; month <= 12; month++)
+                        {
+                            <option value="@month" selected="@(Model.birthMonth == month)">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetMonthName(month)</option>
+                        }
+                    </select>
+                    <select id="signup-birth-day" name="birthDay" class="auths-select auths-birthday-day" disabled="@Model.signupDisabled">
+                        <option value="" selected="@(Model.birthDay == null)">Day</option>
+                        @for (var day = 1; day <= 31; day++)
+                        {
+                            <option value="@day" selected="@(Model.birthDay == day)">@day</option>
+                        }
+                    </select>
+                    <select id="signup-birth-year" name="birthYear" class="auths-select auths-birthday-year" disabled="@Model.signupDisabled">
+                        <option value="" selected="@(Model.birthYear == null)">Year</option>
+                        @for (var year = currentYear; year >= 1900; year--)
+                        {
+                            <option value="@year" selected="@(Model.birthYear == year)">@year</option>
+                        }
+                    </select>
+                </div>
             </div>
-        </div>
+
+            <div class="auths-field">
+                <label class="auths-label" for="signup-username">Username</label>
+                <input id="signup-username" disabled="@Model.signupDisabled" type="text" placeholder="Don't use your real name" name="username" value="@Model.username" class="auths-input" autocomplete="username" />
+            </div>
+
+            <div class="auths-field">
+                <label class="auths-label" for="signup-password">Password</label>
+                <input id="signup-password" disabled="@Model.signupDisabled" type="password" placeholder="At least 8 characters" name="password" class="auths-input" autocomplete="new-password" />
+            </div>
+
+            <div class="auths-field">
+                <span class="auths-label">Gender <span class="auths-optional">(optional)</span></span>
+                <div class="auths-gender">
+                    <label class="auths-gender-opt">
+                        <input disabled="@Model.signupDisabled" type="radio" name="gender" value="male" checked="@(Model.gender == "male")" />
+                        <span class="auths-gender-seg" title="Male">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="10" cy="14" r="5.2"></circle>
+                                <path d="M13.9 10.1 20 4"></path>
+                                <path d="M15 4h5v5"></path>
+                            </svg>
+                            <span class="visually-hidden">Male</span>
+                        </span>
+                    </label>
+                    <label class="auths-gender-opt">
+                        <input disabled="@Model.signupDisabled" type="radio" name="gender" value="female" checked="@(Model.gender == "female")" />
+                        <span class="auths-gender-seg" title="Female">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="9" r="5.2"></circle>
+                                <path d="M12 14.2V21"></path>
+                                <path d="M9 18.4h6"></path>
+                            </svg>
+                            <span class="visually-hidden">Female</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <p class="auths-terms">
+                By clicking Sign Up, you are agreeing to the <a href="/auth/tos">Terms of Use</a> including the arbitration clause and you are acknowledging the
+                <a href="/auth/privacy">Privacy Policy</a>.
+            </p>
+
+            @Html.AntiForgeryToken()
+            <button disabled="@Model.signupDisabled" class="auths-submit" type="submit" id="signup-submit">Sign Up</button>
+        </form>
     </div>
+
+    @if (Model.applicationId != null && Model.invite == null)
+    {
+        <p class="auths-switch">
+            Already have an account you'd like to reactivate? <a href="/auth/login?applicationId=@Model.applicationId">Log in here</a>.
+        </p>
+    }
+    else
+    {
+        <p class="auths-switch">
+            Already have an account? <a href="/auth/login">Log in here</a>.
+        </p>
+    }
 </div>

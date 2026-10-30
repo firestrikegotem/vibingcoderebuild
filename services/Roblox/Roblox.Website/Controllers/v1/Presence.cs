@@ -10,10 +10,10 @@ namespace Roblox.Website.Controllers;
 public class PresenceControllerV1 : ControllerBase
 {
     [HttpPost("presence/register-app-presence")]
-    public async Task RegisterPresence()
+    public Task RegisterPresence()
     {
         // TODO: Impersonating: Don't update online status if requester is impersonating
-        
+        return Task.CompletedTask;
     }
 
     [HttpPost("presence/users")]

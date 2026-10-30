@@ -29,7 +29,7 @@ public class AsyncLimitUnitTest
         var asyncLimit = new AsyncLimit("UnitTest1", 10);
         for (var i = 0; i < 10; i++)
         {
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(1));
                 await using var j = await asyncLimit.CreateAsync(TimeSpan.FromSeconds(5));

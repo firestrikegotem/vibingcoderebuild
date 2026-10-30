@@ -69,7 +69,7 @@ public class GameServerPort
     {
 #if DEBUG
         return originalBaseUrl + ":" + port;
-#endif
+#else
         // URL format is like "gs1-1.example.com"
         var matched = idConversionRegex.Match(originalBaseUrl);
         if (!matched.Success || matched.Groups.Count < 2)
@@ -77,6 +77,7 @@ public class GameServerPort
         var serverId = matched.Groups[1].Value;
         Console.WriteLine("Captured id = {0}",serverId);
         return "gs" + serverId + "-" + id + "." + Roblox.Configuration.GameServerDomain;
+#endif
     }
 }
 

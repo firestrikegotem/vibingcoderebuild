@@ -22,7 +22,7 @@ const InventoryGrid = props => {
   const isEmpty = store.data && store.data.Items.length === 0 && !store.previousPageAvailable();
   const showPaging = store.data && !isEmpty;
 
-  let total = store.data ? (store.data?.TotalItems?.toLocaleString() || 'many') : null; // roblox started returning "null" for TotalItems :(
+  let total = store.data ? (store.data?.TotalItems?.toLocaleString() || 'many') : null; // bloxyn started returning "null" for TotalItems :(
   if (myPage === 1 && store.data.Items.length <= 24) {
     total = '1';
   }

@@ -572,11 +572,11 @@ public class ForumsService : ServiceBase
             var postData = postInfo.FirstOrDefault(c => c.postId == item.id || c.threadId == item.id);
             if (postData == null) continue;
 
-            var replies = await CountReplies(item.threadId.Value);
+            var replies = await CountReplies(item.threadId ?? 0);
             var isRead = contextUserId != null && await IsPostRead(contextUserId.Value, item.id);
             var parent = postData.threadId == null
                 ? postData
-                : postInfo.FirstOrDefault(a => a.postId == item.threadId.Value);
+                : postInfo.FirstOrDefault(a => a.postId == (item.threadId ?? 0));
             postData.threadId ??= postData.postId;
 
             postData.title = parent?.title ?? "[ Content Deleted ]";

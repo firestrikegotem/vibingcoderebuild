@@ -52,9 +52,9 @@ public class ItemConfigurationV1 : ControllerBase
     }
 
     [HttpPost("assets/{assetId:long}/update")]
-    public async Task UpdateAssetNoOp(long assetId)
+    public Task UpdateAssetNoOp(long assetId)
     {
-        return;
+        return Task.CompletedTask;
     }
 
     private readonly Models.Assets.Type[] sellableAssetTypes = {
@@ -116,9 +116,13 @@ public class ItemConfigurationV1 : ControllerBase
     [HttpPost("assets/{assetId:long}/release")]
     public async Task ReleaseAsset(long assetId)
     {
-        await services.assets.ValidatePermissions(assetId, userSession.userId);
-        // services/api/src/controllers/proxy/v1/ItemConfiguration.ts:75
-        throw new NotImplementedException();
+        await services.assets.ValidatePermissions(assetId, safeUserSession.userId);
+        // Releasing an asset publishes it to the catalog. The item stays purchasable at its
+        // current price (a price of 0 means it is free, which is valid).
+        var details = await services.assets.GetAssetCatalogInfo(assetId);
+        if (details.moderationStatus != Models.Assets.ModerationStatus.ReviewApproved)
+            throw new RobloxException(400, 0, "This asset must be approved by moderation before it can be released.");
+        await services.assets.UpdateItemIsForSale(assetId, true);
     }
 
     [HttpGet("creations/get-assets")]

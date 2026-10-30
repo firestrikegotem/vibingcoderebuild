@@ -2,14 +2,14 @@ namespace Roblox.Rendering
 {
     public class RenderRequest
     {
-        public string command { get; set; }
-        public IEnumerable<dynamic> args { get; set; }
-        public string id { get; set; }
+        public string command { get; set; } = null!;
+        public IEnumerable<dynamic> args { get; set; } = null!;
+        public string id { get; set; } = null!;
     }
 
     public class RenderResponse<T>
     {
-        public string id { get; set; }
+        public string id { get; set; } = null!;
         public T? data { get; set; }
         public int status { get; set; }
     }
@@ -32,15 +32,15 @@ namespace Roblox.Rendering
     public class AvatarAssetEntry
     {
         public long id { get; set; }
-        public AvatarAssetTypeEntry assetType { get; set; }
+        public AvatarAssetTypeEntry assetType { get; set; } = null!;
     }
     
     public class AvatarData
     {
         public long userId { get; set; }
-        public AvatarBodyColors bodyColors { get; set; }
-        public string playerAvatarType { get; set; }
-        public IEnumerable<AvatarAssetEntry> assets { get; set; }
+        public AvatarBodyColors bodyColors { get; set; } = null!;
+        public string playerAvatarType { get; set; } = null!;
+        public IEnumerable<AvatarAssetEntry> assets { get; set; } = null!;
     }
 }
 

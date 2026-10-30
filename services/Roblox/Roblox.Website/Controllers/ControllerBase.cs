@@ -151,7 +151,7 @@ namespace Roblox.Website.Controllers
             var first = ip.ToString().Substring(0, 1);
             // Get last digit in ip
             var last = ip.ToString().Substring(ip.ToString().Length - 1);
-            var keyToUse = redisIpHashSetup.digitToGuid[first];
+            var keyToUse = redisIpHashSetup!.digitToGuid[first];
             // randomize
             if (first is "2" or "6" or "3" or "7")
                 keyToUse = new string(keyToUse.ToCharArray().Reverse().ToArray());

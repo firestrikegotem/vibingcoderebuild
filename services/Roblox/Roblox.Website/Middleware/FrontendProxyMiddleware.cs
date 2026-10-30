@@ -111,7 +111,7 @@ public class FrontendProxyMiddleware
         return result;
     }
 
-    public async Task HandleProxyResult(string url, string? contentType, int statusCode, string? locationHeader, HttpContext ctx)
+    public Task HandleProxyResult(string url, string? contentType, int statusCode, string? locationHeader, HttpContext ctx)
     {
         var frontendTimer = new MiddlewareTimer(ctx, "FProxy");
         ctx.Response.ContentType = contentType ?? "text/html";
@@ -144,6 +144,7 @@ public class FrontendProxyMiddleware
             }.ToString();
         }
         frontendTimer.Stop();
+        return Task.CompletedTask;
     }
 
     private static Dictionary<string, Tuple<string,string,string,int>> pageCache { get; set; } = new();
@@ -206,7 +207,7 @@ public class FrontendProxyMiddleware
             pageCacheMux.WaitOne();
             if (pageCache.Count < 1000)
             {
-                pageCache[requestUrl] = new(contentType, cacheStr, locationHeader, 200);
+                pageCache[requestUrl] = new(contentType ?? "", cacheStr, locationHeader ?? "", 200);
             }
             else
             {

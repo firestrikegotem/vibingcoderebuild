@@ -19,10 +19,18 @@ const scripts: Record<string, string> = {
 	gameThumbnail: fs.readFileSync(path.join(__dirname, '../scripts/asset/game.lua')).toString(),
 }
 
+// RCC's TrustCheck refuses assets served from the "localhost" hostname, so always hand the
+// render scripts the raw loopback IP. This is also what makes self-hosted deployments work:
+// without it the scripts keep pointing at whatever domain was hardcoded in them.
+const renderBaseUrl = conf.baseUrl.replace('//localhost', '//127.0.0.1');
+
 for (const s in scripts) {
 	scripts[s] = scripts[s]
 		// set base url
-		.replace(/local url = "base_url"/g, `local url = "${conf.baseUrl}"`)
+		.replace(/local url = "base_url"/g, `local url = "${renderBaseUrl}"`)
+		// every script declares its own hardcoded host - overwrite all of them
+		.replace(/local baseURL = "http[^"]*";/g, `local baseURL = "${renderBaseUrl}";`)
+		.replace(/http:\/\/economy-simulator\.org/g, renderBaseUrl)
 		// set access key
 		.replace(/_AUTHORIZATION_STRING_/g, conf.authorization.replace('"', '\\"'))
 		.replace(/isDebugServer = false/g, env === 'development' ? 'isDebugServer = true' : 'isDebugServer = false')

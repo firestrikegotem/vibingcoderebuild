@@ -13,7 +13,7 @@ const GamesPage = props => {
 export const getStaticProps = () => {
   return {
     props: {
-      title: 'Games - ROBLOX',
+      title: 'Games - BLOXYN',
     }
   }
 }

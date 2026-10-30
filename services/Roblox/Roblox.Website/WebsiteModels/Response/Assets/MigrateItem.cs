@@ -128,7 +128,7 @@ public class MigrateItem
         if (contentId != null)
         {
             var imageData = await robloxApi.GetAssetContent((long) contentId);
-            if (robloxDetails.AssetTypeId == null)
+            if (robloxDetails!.AssetTypeId == null)
                 throw new Exception("Null " + nameof(robloxDetails.AssetTypeId));
             var ok = await assets.ValidateClothing(imageData, robloxDetails.AssetTypeId.Value);
             if (ok == null)
@@ -155,7 +155,7 @@ public class MigrateItem
             content = null;
         }
 
-        if (robloxDetails.Name == null)
+        if (robloxDetails!.Name == null)
             throw new Exception("Null " + nameof(robloxDetails.Name));
         if (robloxDetails.AssetTypeId == null)
             throw new Exception("Null " + nameof(robloxDetails.AssetTypeId));

@@ -67,14 +67,14 @@ public class EconomyChat : ControllerBase
     [HttpPost("channels/{channelId:long}/read")]
     public async Task MarkChannelAsRead(long channelId)
     {
-        await chatService.SetReadMessage(userSession.userId, channelId);
+        await chatService.SetReadMessage(safeUserSession.userId, channelId);
     }
 
     [HttpPost("channels/{channelId:long}/send")]
     public async Task<ChatMessage> CreateMessage(long channelId, [Required, FromBody] CreateMessageRequest request)
     {
         request.channelId = channelId;
-        return await chatService.CreateChannelMessage(userSession.userId, request);
+        return await chatService.CreateChannelMessage(safeUserSession.userId, request);
     }
 
     [HttpDelete("channels/{channelId:long}/messages/{messageId:long}")]

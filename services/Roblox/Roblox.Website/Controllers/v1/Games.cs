@@ -95,7 +95,7 @@ public class GamesControllerV1 : ControllerBase
     public dynamic MultiGetPlayabilityStatus()
     {
         var ids = HttpContext.Request.QueryString.Value;
-        return numberRegex.Matches(ids).Select(c => long.Parse(c.Value)).Distinct().Select(c => new
+        return numberRegex.Matches(ids ?? "").Select(c => long.Parse(c.Value)).Distinct().Select(c => new
         {
             playabilityStatus = "Playable",
             isPlayable = true,
@@ -116,7 +116,7 @@ public class GamesControllerV1 : ControllerBase
     public async Task<dynamic> GetRecommendedGames(long universeId, int maxRows = 6)
     {
         if (maxRows is > 100 or < 1) maxRows = 10;
-        var result = await services.games.GetGamesList(userSession.userId, "popular", maxRows, null, null);
+        var result = await services.games.GetGamesList(safeUserSession.userId, "popular", maxRows, null, null);
         return new
         {
             games = result,
@@ -159,7 +159,7 @@ public class GamesControllerV1 : ControllerBase
     public async Task VoteOnUniverse(long universeId, [Required, FromBody] VoteRequest request)
     {
         var uni = (await services.games.MultiGetUniverseInfo(new[] {universeId})).FirstOrDefault();
-        await services.assets.VoteOnAsset(uni.rootPlaceId, safeUserSession.userId, request.vote);
+        await services.assets.VoteOnAsset(uni!.rootPlaceId, safeUserSession.userId, request.vote);
     }
 
     // ==========================================
@@ -189,14 +189,14 @@ public class GamesControllerV1 : ControllerBase
             "INSERT INTO asset (name, asset_type, asset_genre, creator_type, creator_id, moderation_status) VALUES (@name, 9, 0, 1, @creatorId, 1) RETURNING id", conn);
         cmdAsset.Parameters.AddWithValue("name", request.name);
         cmdAsset.Parameters.AddWithValue("creatorId", userSession.userId);
-        var placeId = (long)await cmdAsset.ExecuteScalarAsync();
+        var placeId = (long)(await cmdAsset.ExecuteScalarAsync())!;
 
         // 2. Create Asset Version
         using var cmdVer = new NpgsqlCommand(
             "INSERT INTO asset_version (asset_id, version_number, creator_id, content_url) VALUES (@assetId, 1, @creatorId, @contentUrl) ON CONFLICT DO NOTHING", conn);
         cmdVer.Parameters.AddWithValue("assetId", placeId);
         cmdVer.Parameters.AddWithValue("creatorId", userSession.userId);
-        cmdVer.Parameters.AddWithValue("contentUrl", $"http://localhost:5000/asset/?id={placeId}");
+        cmdVer.Parameters.AddWithValue("contentUrl", $"http://127.0.0.1:5000/asset/?id={placeId}");
         await cmdVer.ExecuteNonQueryAsync();
 
         // 3. Create Asset Place Settings
@@ -210,7 +210,7 @@ public class GamesControllerV1 : ControllerBase
             "INSERT INTO universe (root_asset_id, creator_id, creator_type, is_public) VALUES (@placeId, @creatorId, 1, true) RETURNING id", conn);
         cmdUniverse.Parameters.AddWithValue("placeId", placeId);
         cmdUniverse.Parameters.AddWithValue("creatorId", userSession.userId);
-        var universeId = (long)await cmdUniverse.ExecuteScalarAsync();
+        var universeId = (long)(await cmdUniverse.ExecuteScalarAsync())!;
 
         return new
         {

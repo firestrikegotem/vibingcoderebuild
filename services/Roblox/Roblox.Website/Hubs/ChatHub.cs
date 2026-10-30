@@ -30,9 +30,9 @@ public class ChatHub : Hub
         }
     }
 
-    public async Task<string> ListenForMessages()
+    public Task<string> ListenForMessages()
     {
-        return Guid.NewGuid().ToString();
+        return Task.FromResult(Guid.NewGuid().ToString());
     }
 
     public override async Task OnConnectedAsync()

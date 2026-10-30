@@ -13,7 +13,7 @@ namespace Roblox.Rendering
         private static System.Threading.Mutex mux { get; set; } = new();
         private static ClientWebSocket? ws { get; set; }
         private static Dictionary<string, Func<RenderResponse<Stream>,int>> resultListeners { get; } = new();
-        private static Uri wsUrl { get; set; }
+        private static Uri wsUrl { get; set; } = null!;
 
         public static void Configure(string baseUrl, string authorization)
         {
@@ -35,7 +35,13 @@ namespace Roblox.Rendering
             {
                 try
                 {
-                    var result = await ws.ReceiveAsync(memory.Memory, CancellationToken.None);
+                    var socket = ws;
+                    if (socket == null || socket.State != WebSocketState.Open)
+                    {
+                        await Task.Delay(1000);
+                        continue;
+                    }
+                    var result = await socket.ReceiveAsync(memory.Memory, CancellationToken.None);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
                         Console.WriteLine("[info] Render websocket closed. Re-opening...");
@@ -172,7 +178,7 @@ namespace Roblox.Rendering
                 {
                     if (res.TrySetCanceled(cancellationToken.Value) && command != "Cancel")
                     {
-                        SendCommand("Cancel", new List<dynamic>()
+                        _ = SendCommand("Cancel", new List<dynamic>()
                         {
                             id,
                         }, CancellationToken.None);

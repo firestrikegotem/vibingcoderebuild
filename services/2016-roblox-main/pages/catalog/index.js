@@ -56,7 +56,7 @@ const CatalogPage = props => {
 
 CatalogPage.getInitialProps = () => {
   return {
-    title: 'Catalog - ROBLOX',
+    title: 'Catalog - BLOXYN',
   }
 }
 

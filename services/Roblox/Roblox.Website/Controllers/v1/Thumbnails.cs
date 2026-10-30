@@ -24,8 +24,8 @@ public class ThumbnailsControllerV1 : ControllerBase
         // this thing is annoying in debug
 #if DEBUG
         return;
-#endif
-        Task.Run(async () =>
+#else
+        _ = Task.Run(async () =>
         {
             while (true)
             {
@@ -41,10 +41,13 @@ public class ThumbnailsControllerV1 : ControllerBase
                 await Task.Delay(TimeSpan.FromMinutes(5));
             }
         });
+#endif
     }
     
     private static async Task ThumbnailFixTask()
     {
+        // Release only awaits the lock, so make the no-op explicit for debug builds.
+        await Task.CompletedTask;
         // Debug envs always have one site running, so we don't need a lock
 #if !DEBUG
         await using var distributedThumbFixLock =

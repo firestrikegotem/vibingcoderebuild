@@ -67,7 +67,7 @@ public class ApplicationWebsiteService : WebsiteService
         // Users will submit apps with weird text like:
         // "roblox: https://www.roblox.com/users/1561515/profile reddit: https://www.reddit.com/users/spez"
         // so we can't use a basic URI parser, we have to make our own
-        var socialData = AppSocialMedia.ParseFirstUrl(socialUrl);
+        var socialData = AppSocialMedia.ParseFirstUrl(socialUrl!);
         if (socialData != null && socialData.IsRedirectProfile())
         {
             // Can be null if redirect is bad, so do this before null check
@@ -80,7 +80,7 @@ public class ApplicationWebsiteService : WebsiteService
         
         // Note that we skip "web.roblox.com" verification - it's a waste of everyone's time and our server resources.
         // These apps get auto declined anyway.
-        var isUnderageUser = socialUrl.Contains("web.roblox.com");
+        var isUnderageUser = socialUrl!.Contains("web.roblox.com");
 
         if (!isUnderageUser)
         {

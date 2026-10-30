@@ -157,7 +157,7 @@ public class GameServerService : ServiceBase
             }
             else
             {
-                await ec.IncrementCurrency(placeDetails.creatorTargetId, CurrencyType.Tickets, 1);
+                await ec.IncrementCurrency(CreatorType.User, placeDetails.creatorTargetId, CurrencyType.Tickets, 1);
                 await InsertAsync("user_transaction", new
                 {
                     amount = 10,
@@ -214,7 +214,7 @@ public class GameServerService : ServiceBase
             await InTransaction(async _ =>
             {
                 using var ec = ServiceProvider.GetOrCreate<EconomyService>(this);
-                await ec.IncrementCurrency(userId, CurrencyType.Tickets, earnedTickets);
+                await ec.IncrementCurrency(CreatorType.User, userId, CurrencyType.Tickets, earnedTickets);
                 await InsertAsync("user_transaction", new
                 {
                     amount = earnedTickets,
@@ -386,6 +386,7 @@ public class GameServerService : ServiceBase
     public async Task<List<Tuple<GameServerInfoResponse,GameServerConfigEntry>>> GetAllGameServers()
     {
         var getServerDataTasks = new List<Task<GameServerInfoResponse?>>();
+        // dev shortcut above returns before this loop, which is intentional
         foreach (var entry in Configuration.GameServerIpAddresses)
         {
             var data = entry.ip.Split(":");
@@ -547,6 +548,8 @@ public class GameServerService : ServiceBase
             };
         }
 
+        // the dev shortcut above returns first; the loop is kept for release builds
+        #pragma warning disable CS0162
         foreach (var entry in Configuration.GameServerIpAddresses)
         {
             var data = entry.ip.Split(":");
@@ -557,10 +560,11 @@ public class GameServerService : ServiceBase
                 var watch = new Stopwatch();
                 watch.Start();
                 var serverInfo = await GetGameServerInfo(ip, port);
+                if (serverInfo == null) continue;
                 watch.Stop();
                 GameMetrics.ReportTimeToGetGameServerInfo(ip, port, watch.ElapsedMilliseconds);
                 
-                var runningGames = serverInfo.data.ToList();
+                var runningGames = serverInfo.data!.ToList();
                 var runningPlace = runningGames.Find(v => v.placeId == placeId && !v.isFull);
                 if (runningPlace != null)
                 {
@@ -618,6 +622,7 @@ public class GameServerService : ServiceBase
             }
             
         }
+        #pragma warning restore CS0162
 
         return new()
         {

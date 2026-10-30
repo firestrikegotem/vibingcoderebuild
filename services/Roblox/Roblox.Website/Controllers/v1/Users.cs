@@ -99,7 +99,7 @@ public class UsersControllerV1 : ControllerBase
     {
         try
         {
-            await services.users.SetUserStatus(userSession.userId, request.status);
+            await services.users.SetUserStatus(safeUserSession.userId, request.status);
         }
         catch (Exception e) when (e is StatusTooLongException or StatusTooShortException)
         {

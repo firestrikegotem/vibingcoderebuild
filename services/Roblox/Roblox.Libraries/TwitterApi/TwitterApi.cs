@@ -30,7 +30,7 @@ public class TwitterUserObject
 
 public class GenericTwitterResponse<T>
 {
-    public IEnumerable<T> data { get; set; }
+    public IEnumerable<T> data { get; set; } = null!;
 }
 
 public class TwitterRecordNotFoundException : Exception

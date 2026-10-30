@@ -9,8 +9,8 @@ public class Metadata
 public class Channel
 {
     public long id { get; set; }
-    public string name { get; set; }
-    public string description { get; set; }
+    public string name { get; set; } = null!;
+    public string description { get; set; } = null!;
     public bool isAdminRequiredForReading { get; set; }
     public bool isAdminRequiredForWriting { get; set; }
 

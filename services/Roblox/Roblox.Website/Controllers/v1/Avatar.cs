@@ -182,7 +182,7 @@ public class AvatarControllerV1 : ControllerBase
     {
         FeatureCheck();
         var info = await services.avatar.GetOutfitById(outfitId);
-        if (info.details.userId != userSession.userId)
+        if (info.details.userId != safeUserSession.userId)
             throw new ForbiddenException(0, "Forbidden");
         
         await services.avatar.DeleteOutfit(outfitId);
@@ -259,7 +259,7 @@ public class AvatarControllerV1 : ControllerBase
     [HttpGet("avatar")]
     public async Task<dynamic> GetMyAvatar()
     {
-        return await GetAvatar(userSession.userId);
+        return await GetAvatar(safeUserSession.userId);
     }
 
     [HttpGet("avatar/metadata")]

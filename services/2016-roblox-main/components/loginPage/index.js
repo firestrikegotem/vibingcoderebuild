@@ -6,16 +6,18 @@ import LoginArea from "./components/loginArea";
 import SignUpArea from "./components/signUpArea";
 
 const Login = () => {
-    return <div className='container'>
-        <div className='row'>
-            <div className='col-12 col-lg-6 divider-right'>
-                <LoginArea></LoginArea>
+    return <div className='login-page-background'>
+        <div className='container login-page-container'>
+            <div className='row'>
+                <div className='col-12 col-lg-6 divider-right'>
+                    <LoginArea></LoginArea>
+                </div>
+                <div className='col-12 col-lg-6'>
+                    <SignUpArea></SignUpArea>
+                </div>
             </div>
-            <div className='col-12 col-lg-6'>
-                <SignUpArea></SignUpArea>
-            </div>
+            <div className='mt-4 divider-bottom'></div>
         </div>
-        <div className='mt-4 divider-bottom'></div>
     </div>
 }
 
