@@ -1000,7 +1000,7 @@ public class UsersService : ServiceBase, IService
         return result;
     }
 
-    public async Task<UserId> CreateUser(string username, string password, Gender gender, long? overrideUserId = null)
+    public async Task<UserId> CreateUser(string username, string password, Gender gender, long? overrideUserId = null, DateTime? birthday = null)
     {
         if (!Enum.IsDefined(gender))
             throw new ArgumentException(nameof(gender) + " is invalid: " + gender);
@@ -1042,6 +1042,11 @@ public class UsersService : ServiceBase, IService
                     password = h,
                 });
             }
+
+            // Birthday is optional: only the web sign up form collects it.
+            if (birthday != null)
+                await db.ExecuteAsync("UPDATE \"user\" SET birthday = :birthday WHERE id = :id",
+                    new { birthday = birthday.Value.Date, id = userId });
 
             // Account settings
             await InsertAsync("user_settings", "user_id", new

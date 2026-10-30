@@ -238,21 +238,21 @@ public class Signup : RobloxPageModel
             return new PageResult();
         }
 
-        // Birthday is part of the 2016 sign up layout. There is no birthday column on the users
-        // table and the upstream signup API deliberately ignores it (SignUpRequest.birthday is
-        // marked obsolete), so the date is validated for a complete form but is not persisted.
+        // Birthday is required by the sign up form and stored on the user row (see the
+        // addUserBirthday migration). It stays out of the public user API.
         if (birthMonth == null || birthDay == null || birthYear == null)
         {
             errorMessage = "Please enter your birthday.";
             return Page();
         }
 
+        var birthdayDate = DateTime.MinValue;
         var birthdayValid = birthMonth is >= 1 and <= 12 && birthYear is >= 1900 and <= 2100 && birthDay is >= 1 and <= 31;
         if (birthdayValid)
         {
             try
             {
-                _ = new DateTime(birthYear!.Value, birthMonth!.Value, birthDay!.Value);
+                birthdayDate = new DateTime(birthYear!.Value, birthMonth!.Value, birthDay!.Value);
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -321,7 +321,7 @@ public class Signup : RobloxPageModel
         try
         {
             createdUser =
-                await services.users.CreateUser(username, password, selectedGender);
+                await services.users.CreateUser(username, password, selectedGender, birthday: birthdayDate);
         }
         catch (Exception)
         {
