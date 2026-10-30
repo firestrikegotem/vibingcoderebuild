@@ -36,7 +36,16 @@ const CharacterCustomizationStore = createContainer(() => {
   useEffect(() => {
     if (!isRendering) return;
     setIsModified(false);
+    let attempts = 0;
     const timer = setInterval(() => {
+      attempts++;
+      // A render that fails never reports Completed, so stop waiting eventually
+      // instead of leaving the avatar stuck on "Loading..." forever.
+      if (attempts > 24) {
+        setIsRendering(false);
+        clearInterval(timer);
+        return;
+      }
       multiGetUserThumbnails({
         userIds: [userId],
       }).then(result => {
@@ -45,7 +54,13 @@ const CharacterCustomizationStore = createContainer(() => {
           setIsRendering(false);
           setThumbnail(user.imageUrl);
           clearInterval(timer);
+        } else if (user.state === 'Error' || user.state === 'Blocked') {
+          setIsRendering(false);
+          clearInterval(timer);
         }
+      }).catch(() => {
+        setIsRendering(false);
+        clearInterval(timer);
       });
     }, 2500);
 
