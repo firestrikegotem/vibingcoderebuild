@@ -251,7 +251,11 @@ public class GameServerService : ServiceBase
 
         var result = await client.PostAsync("http://" + ipAddress + ":" + port + "/api/public-method/", content,
             cancelToken.Value);
-        if (!result.IsSuccessStatusCode) throw new Exception("Unexpected statusCode: " + result.StatusCode + "\nIP = " + ipAddress + "\nPort = " + port);
+        if (!result.IsSuccessStatusCode)
+        {
+            var errorBody = await result.Content.ReadAsStringAsync(cancelToken.Value);
+            throw new Exception("Unexpected statusCode: " + result.StatusCode + "\nIP = " + ipAddress + "\nPort = " + port + "\nResponse = " + errorBody);
+        }
         var response = JsonSerializer.Deserialize<T>(await result.Content.ReadAsStringAsync(cancelToken.Value));
         if (response == null)
         {
@@ -531,7 +535,12 @@ public class GameServerService : ServiceBase
             catch (Exception e)
             {
                 await db.ExecuteAsync("DELETE FROM asset_server WHERE id = :id::uuid", new {id});
-                throw new Exception("Cannot start game server", e);
+                // A failed RCC launch is an operator problem, not a player problem. Log the real
+                // reason (missing RCC, bad config, port clash) and give the player a clean message
+                // instead of a stack trace in the join response.
+                Writer.Info(LogGroup.GameServerJoin, "Failed to start game server for place {0} on {1}:{2} - {3}", placeId, ip, port, e.Message);
+                throw new Roblox.Services.Exceptions.RobloxException(RobloxException.InternalServerError, 0,
+                    "This game is temporarily unavailable because the game server could not be started. Please try again later or contact staff.");
             }
 
             Writer.Info(LogGroup.GameServerJoin, "Created server for {0} at {1}:{2}. Join url = {3}", placeId, entry.domain, gamePort.port, gamePort.ApplyIdToUrl(entry.domain));

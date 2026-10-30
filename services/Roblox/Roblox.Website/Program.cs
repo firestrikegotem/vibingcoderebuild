@@ -31,19 +31,42 @@ Roblox.Services.Database.Configure(configuration.GetSection("Postgres").Value);
 Roblox.Services.Cache.Configure(configuration.GetSection("Redis").Value);
 
 // Config
+// Directory values may be absolute (a deployment) or relative to the website project (a checkout).
+// Resolve them against the content root, and ignore a stale absolute path that does not exist on this
+// machine instead of crashing on the first static file registration.
+var contentRoot = builder.Environment.ContentRootPath;
+string ResolveDirectory(string key, string fallback)
+{
+    var configured = configuration.GetSection("Directories:" + key).Value;
+    if (string.IsNullOrWhiteSpace(configured))
+    {
+        return Path.GetFullPath(Path.Combine(contentRoot, fallback));
+    }
+    if (Path.IsPathRooted(configured))
+    {
+        if (Directory.Exists(configured)) return configured;
+        Console.WriteLine($"[warning] Directories:{key} points at {configured}, which does not exist here. Falling back to {fallback}");
+        return Path.GetFullPath(Path.Combine(contentRoot, fallback));
+    }
+    return Path.GetFullPath(Path.Combine(contentRoot, configured));
+}
+
 Roblox.Configuration.CdnBaseUrl = configuration.GetSection("CdnBaseUrl").Value;
-Roblox.Configuration.AssetDirectory = configuration.GetSection("Directories:Asset").Value;
-Roblox.Configuration.StorageDirectory = configuration.GetSection("Directories:Storage").Value;
-Roblox.Configuration.ThumbnailsDirectory = configuration.GetSection("Directories:Thumbnails").Value;
-Roblox.Configuration.GroupIconsDirectory = configuration.GetSection("Directories:GroupIcons").Value;
-Roblox.Configuration.PublicDirectory = configuration.GetSection("Directories:Public").Value;
-Roblox.Configuration.XmlTemplatesDirectory = configuration.GetSection("Directories:XmlTemplates").Value;
-Roblox.Configuration.JsonDataDirectory = configuration.GetSection("Directories:JsonData").Value;
-Roblox.Configuration.AdminBundleDirectory = configuration.GetSection("Directories:AdminBundle").Value;
-Roblox.Configuration.EconomyChatBundleDirectory = configuration.GetSection("Directories:EconomyChatBundle").Value;
+Roblox.Configuration.StorageDirectory = ResolveDirectory("Storage", "../../api/storage/");
+Roblox.Configuration.AssetDirectory = ResolveDirectory("Asset", "../../api/storage/asset/");
+Roblox.Configuration.PublicDirectory = ResolveDirectory("Public", "../../api/public/");
+Roblox.Configuration.ThumbnailsDirectory = ResolveDirectory("Thumbnails", "../../api/public/images/thumbnails/");
+Roblox.Configuration.GroupIconsDirectory = ResolveDirectory("GroupIcons", "../../api/public/images/groups/");
+Roblox.Configuration.XmlTemplatesDirectory = ResolveDirectory("XmlTemplates", "../Roblox.Libraries/Templates/");
+Roblox.Configuration.JsonDataDirectory = ResolveDirectory("JsonData", "../Roblox.Libraries/Json/");
+Roblox.Configuration.AdminBundleDirectory = ResolveDirectory("AdminBundle", "../../admin/public/");
+Roblox.Configuration.EconomyChatBundleDirectory = ResolveDirectory("EconomyChatBundle", "../../economy-chat/build/");
 Roblox.Configuration.BaseUrl = configuration.GetSection("BaseUrl").Value;
 Roblox.Configuration.HCaptchaPublicKey = configuration.GetSection("HCaptcha:Public").Value;
 Roblox.Configuration.HCaptchaPrivateKey = configuration.GetSection("HCaptcha:Private").Value;
+// Loud on startup, because "captcha silently off" is the difference between a working and a
+// locked-out login page after a fresh deploy.
+Roblox.Libraries.Captcha.HCaptcha.LogConfigurationState();
 Roblox.Configuration.GameServerAuthorization = configuration.GetSection("GameServerAuthorization").Value;
 Roblox.Configuration.BotAuthorization = configuration.GetSection("BotAuthorization").Value;
 
@@ -212,6 +235,7 @@ app.UseExceptionHandler("/error");
 CommandHandler.Configure(configuration.GetSection("Render:BaseUrl").Value, configuration.GetSection("Render:Authorization").Value);
 
 SessionMiddleware.Configure(configuration.GetSection("Jwt:Sessions").Value);
+Configuration.ShowErrorDetails = configuration.GetValue<bool>("ShowErrorDetails");
 app.UseTimerMiddleware(); // Must always be last
 
 _ = Task.Run(async () =>

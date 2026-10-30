@@ -33,6 +33,9 @@ public static class Configuration
     public static string AssetValidationServiceUrl { get; set; }
     public static string AssetValidationServiceAuthorization { get; set; }
     public static string BotAuthorization { get; set; }
+    // When false (the default), API error responses never expose exception messages or stack
+    // traces to clients. Turn on for local debugging only - see docs in README.
+    public static bool ShowErrorDetails { get; set; } = false;
     // Discord account linking. A player has to prove they are in the Bloxyn Discord server before
     // they can create an account, so these values drive the OAuth flow on /auth/discord.
     public static string DiscordClientId { get; set; } = "";

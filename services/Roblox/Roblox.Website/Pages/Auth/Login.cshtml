@@ -45,7 +45,10 @@
                 <p class="auths-forgot"><a href="/auth/password-reset">Forgot username or password?</a></p>
             }
 
-            <div class="h-captcha mt-3 mb-3" data-sitekey="@Model.siteKey" data-theme="light"></div>
+            @if (Roblox.Libraries.Captcha.HCaptcha.ShouldRenderWidget)
+            {
+                <div class="h-captcha mt-3 mb-3" data-sitekey="@Model.siteKey" data-theme="light"></div>
+            }
 
             @Html.AntiForgeryToken()
             <button disabled="@Model.loginDisabled" class="auths-submit" type="submit" id="login-submit">Log In</button>

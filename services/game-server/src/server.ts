@@ -41,7 +41,8 @@ app.post('/api/public-method', (req, res, next) => {
 				res.status(200).json(result).end();
 			}).catch(e => {
 				console.error('[error] error handling method', b.method, e);
-				res.status(500).json({ success: false }).end();
+				// Include the reason so the website can tell an operator what actually went wrong.
+				res.status(500).json({ success: false, error: (e && e.message) ? e.message : String(e) }).end();
 			})
 		} else {
 			res.status(200).json(c).end();

@@ -130,6 +130,7 @@ interface IGamePlayerEntry {
 interface IGameEntry {
 	rccReference: IRccConnection|null;
 	rccClosed: boolean;
+	rccFailureReason?: string;
 	stdout: string;
 	stderr: string;
 	exitCode: number|string;
@@ -240,11 +241,15 @@ export default class CommandHandler extends StdExceptions {
 		let rcc: cp.ChildProcessWithoutNullStreams;
 		const dockerPidFileLocation = path.join(__dirname, '../../rcccid-' + portToRunOn);
 		let rccCid: string|undefined;
+		// Describes what was launched so a failure can tell the operator what to fix.
+		let rccTarget = 'docker start-rcc.sh';
 		if (!dockerEnabled) {
 			// Default to the RCC folder that sits next to the other services, so a checkout works
 			// without editing config.json. Events waiting for players use conf.rcc when set.
 			const rccPath = conf.rcc || path.join(__dirname, '../../../RCCService') + path.sep;
-			const rccExecutable = rccPath + (os.platform() === 'win32' ? 'RCCService.exe' : 'rcc');
+			const rccExecutableName = os.platform() === 'win32' ? 'RCCService.exe' : 'rcc';
+			const rccExecutable = rccPath + rccExecutableName;
+			rccTarget = rccExecutable;
 			rcc = cp.spawn(rccExecutable, ['-Console', '-PlaceId:1818', '-port', portToRunOn.toString(), '-Content', conf.content || path.join(rccPath, './content/')], {
 				cwd: rccPath,
 				stdio: 'pipe',
@@ -256,6 +261,19 @@ export default class CommandHandler extends StdExceptions {
 			rcc = cp.spawn('/usr/bin/sudo', [path.join(__dirname, '../../start-rcc.sh'), portToRunOn.toString()]);
 		}
 		game.rccClosed = false;
+		// A missing or non-executable RCC binary used to surface as an unhandled 'error' event which
+		// killed the whole game server. Record a readable reason instead so the HTTP caller and the
+		// logs explain what is wrong, and let waitForRcc() fail this one game.
+		rcc.on('error', (err: NodeJS.ErrnoException) => {
+			const reason = err && err.code === 'ENOENT'
+				? `RCCService executable not found at ${rccTarget}. Install RCCService, or point "rcc" in config.json at the folder containing ${os.platform() === 'win32' ? 'RCCService.exe' : 'rcc'}.`
+				: `Could not start RCCService (${rccTarget}): ${err?.message ?? err}`;
+			console.error('[error] ' + reason);
+			game.rccFailureReason = reason;
+			game.stderr += reason + '\n';
+			game.rccClosed = true;
+			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
+		});
 		rcc.on('message', (msg) => {
 			console.log(msg);
 		});
@@ -374,7 +392,7 @@ export default class CommandHandler extends StdExceptions {
 				throw new Error('Waited over 10 seconds for rcc, give up');
 			}
 			if (game.rccClosed) {
-				throw new Error('RCC was closed');
+				throw new Error(game.rccFailureReason || 'RCC was closed');
 			}
 			try {
 				const result = await axiosClient.request({

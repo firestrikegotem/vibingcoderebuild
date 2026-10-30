@@ -147,6 +147,16 @@ public class FrontendProxyMiddleware
         return Task.CompletedTask;
     }
 
+    private const string FrontendUnavailablePage = @"<!DOCTYPE html>
+<html><head><title>Bloxyn is starting up</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;background:#e3e3e3;margin:0;padding:60px;text-align:center;color:#333}
+h1{color:#00a23d;font-size:28px}p{font-size:15px;line-height:1.6}code{background:#fff;padding:2px 6px;border-radius:3px}</style>
+</head><body>
+<h1>Bloxyn is starting up</h1>
+<p>The web frontend is not running yet, so this page cannot be rendered.</p>
+<p>Start it with <code>npm run start</code> in <code>services/2016-roblox-main</code>, then reload.</p>
+</body></html>";
+
     private static Dictionary<string, Tuple<string,string,string,int>> pageCache { get; set; } = new();
     private static Mutex pageCacheMux { get; set; } = new();
 
@@ -185,7 +195,21 @@ public class FrontendProxyMiddleware
             return;
         }
 #endif
-        var result = await ProxyRequestAsync(requestUrl);
+        HttpResponseMessage result;
+        try
+        {
+            result = await ProxyRequestAsync(requestUrl);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            // Next.js is a separate process. If it is down, say so instead of throwing a 500 on
+            // every single page - a 503 with a real explanation is debuggable, an empty 500 is not.
+            Console.WriteLine("[PROXY] frontend on localhost:3000 is unreachable ({0})", e.Message);
+            ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            ctx.Response.ContentType = "text/html";
+            await ctx.Response.WriteAsync(FrontendUnavailablePage);
+            return;
+        }
         var str = await result.Content.ReadAsStreamAsync();
         // First, copy to memory
         var mem = new MemoryStream();

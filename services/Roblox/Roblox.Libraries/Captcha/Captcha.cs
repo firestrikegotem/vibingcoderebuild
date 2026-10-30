@@ -13,13 +13,36 @@ public class HCaptcha
 {
     private static HttpClient client { get; } = new();
     /// <summary>
-    /// True when both hCaptcha keys are configured. Self-hosted deployments often run without
-    /// captcha keys; in that case the widget renders nothing and every check would fail closed,
-    /// locking everyone out of login/reset/application forms.
+    /// hCaptcha's public documented test pair. It renders a working widget but is not a real
+    /// account secret, so treating it as "configured" leaves a fresh deployment unable to log in
+    /// until the operator replaces it. We treat the test pair the same as empty and warn instead.
     /// </summary>
+    private const string TestSiteKey = "10000000-ffff-ffff-ffff-000000000001";
+    private const string TestSecretKey = "0x0000000000000000000000000000000000000000";
+
+    private static bool usingTestKeys =>
+        Roblox.Configuration.HCaptchaPublicKey == TestSiteKey ||
+        Roblox.Configuration.HCaptchaPrivateKey == TestSecretKey;
+
     public static bool IsEnabled =>
         !string.IsNullOrEmpty(Roblox.Configuration.HCaptchaPublicKey) &&
-        !string.IsNullOrEmpty(Roblox.Configuration.HCaptchaPrivateKey);
+        !string.IsNullOrEmpty(Roblox.Configuration.HCaptchaPrivateKey) &&
+        !usingTestKeys;
+
+    /// <summary>
+    /// True when the widget should be rendered at all.
+    /// </summary>
+    public static bool ShouldRenderWidget => IsEnabled;
+
+    public static void LogConfigurationState()
+    {
+        if (IsEnabled)
+            return;
+        if (usingTestKeys)
+            Writer.Info(LogGroup.Captcha, "hCaptcha is using the public test keys, so captcha checks are skipped. Replace HCaptcha:Public and HCaptcha:Private with your own keys to enforce captcha.");
+        else
+            Writer.Info(LogGroup.Captcha, "hCaptcha is not configured, so captcha checks are skipped. Set HCaptcha:Public and HCaptcha:Private to enforce captcha.");
+    }
 
     public static async Task<bool> IsValid(string rawIpAddress, string captchaResponse)
     {
