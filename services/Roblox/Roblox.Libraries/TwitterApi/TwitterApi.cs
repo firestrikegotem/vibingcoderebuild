@@ -33,6 +33,13 @@ public class GenericTwitterResponse<T>
     public IEnumerable<T> data { get; set; } = null!;
 }
 
+public class TwitterNotConfiguredException : Exception
+{
+    public TwitterNotConfiguredException() : base("Twitter is not configured on this site")
+    {
+    }
+}
+
 public class TwitterRecordNotFoundException : Exception
 {
     
@@ -52,8 +59,15 @@ public class TwitterApi
         authorization = newAuth;
     }
 
+    public static bool IsConfigured => !string.IsNullOrWhiteSpace(authorization);
+
     public async Task<TwitterUserObject> GetUserByScreenName(string screenName)
     {
+        if (!IsConfigured)
+        {
+            throw new TwitterNotConfiguredException();
+        }
+
         var encodedName = System.Web.HttpUtility.UrlEncode(screenName);
         var request = new HttpRequestMessage(HttpMethod.Get,
             "https://api.twitter.com/2/users/by?usernames="+encodedName+"&user.fields=created_at,public_metrics,description&tweet.fields=author_id,created_at");

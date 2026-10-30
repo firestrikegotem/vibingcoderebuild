@@ -45,7 +45,11 @@ Roblox.Configuration.GameServerAuthorization = configuration.GetSection("GameSer
 Roblox.Configuration.BotAuthorization = configuration.GetSection("BotAuthorization").Value;
 
 // game-server config stuff
-IConfiguration gameServerConfig = new ConfigurationBuilder().AddJsonFile("game-servers.json").Build();
+// Optional: game-servers.json is gitignored, so a fresh clone has no file here. Joins then report
+// "no game servers available" until one is written (see docs/running-on-windows.md).
+IConfiguration gameServerConfig = new ConfigurationBuilder()
+    .AddJsonFile("game-servers.json", optional: true)
+    .Build();
 Roblox.Configuration.GameServerIpAddresses = gameServerConfig.GetSection("GameServers").Get<IEnumerable<GameServerConfigEntry>>();
 Roblox.Configuration.RccAuthorization = configuration.GetSection("RccAuthorization").Value;
 Roblox.Configuration.AssetValidationServiceUrl = configuration.GetSection("AssetValidation:BaseUrl").Value;
@@ -61,7 +65,17 @@ Roblox.Configuration.PackageRightArmAssetId = long.Parse(configuration.GetSectio
 Roblox.Configuration.PackageLeftLegAssetId = long.Parse(configuration.GetSection("PackageLeftLegAssetId").Value);
 Roblox.Configuration.PackageRightLegAssetId = long.Parse(configuration.GetSection("PackageRightLegAssetId").Value);
 Roblox.Configuration.PackageTorsoAssetId = long.Parse(configuration.GetSection("PackageTorsoAssetId").Value);
-Roblox.Libraries.TwitterApi.TwitterApi.Configure(configuration.GetSection("Twitter:Bearer").Value);
+// Twitter is only used by the social-link verification page. Configure it when there is a bearer,
+// and otherwise leave it unconfigured so the site still starts and that one page reports the error.
+var twitterBearer = configuration.GetSection("Twitter:Bearer").Value;
+if (!string.IsNullOrWhiteSpace(twitterBearer))
+{
+    Roblox.Libraries.TwitterApi.TwitterApi.Configure(twitterBearer);
+}
+else
+{
+    Console.WriteLine("[warn] No Twitter:Bearer configured. Twitter social verification is disabled.");
+}
 
 // Discord (signup gate). Environment variables win over appsettings so the client secret and bot
 // token do not have to live in the repo. A blank value in appsettings also falls through to the
@@ -197,11 +211,19 @@ CommandHandler.Configure(configuration.GetSection("Render:BaseUrl").Value, confi
 SessionMiddleware.Configure(configuration.GetSection("Jwt:Sessions").Value);
 app.UseTimerMiddleware(); // Must always be last
 
-Task.Run(async () =>
+_ = Task.Run(async () =>
 {
-    await Task.Delay(TimeSpan.FromSeconds(5));
-    using var assets = Roblox.Services.ServiceProvider.GetOrCreate<AssetsService>();
-    await assets.FixAssetImagesWithoutMetadata();
+    try
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        using var assets = Roblox.Services.ServiceProvider.GetOrCreate<AssetsService>();
+        await assets.FixAssetImagesWithoutMetadata();
+    }
+    catch (Exception e)
+    {
+        // A failed background repair must never take the site down.
+        Console.WriteLine("[warn] Asset image repair failed: " + e.Message);
+    }
 });
 
 app.UseEndpoints(e =>

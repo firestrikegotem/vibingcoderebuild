@@ -47,6 +47,11 @@ public class DiscordController : ControllerBase
             Path = "/",
         });
 
+        if (string.IsNullOrEmpty(verifier))
+        {
+            return Redirect("/auth/discord?error=start_failed");
+        }
+
         Response.Cookies.Append(DiscordApi.VerifierCookieName, verifier, new CookieOptions
         {
             HttpOnly = true,
@@ -160,6 +165,11 @@ public class DiscordController : ControllerBase
 
         var returnUrl = Request.Cookies["bloxyn_discord_return"];
         Response.Cookies.Delete("bloxyn_discord_return", new CookieOptions { Path = "/" });
+        if (string.IsNullOrEmpty(verifier))
+        {
+            return Redirect("/auth/discord?error=start_failed");
+        }
+
         Response.Cookies.Append(DiscordApi.VerifierCookieName, verifier, new CookieOptions
         {
             HttpOnly = true,

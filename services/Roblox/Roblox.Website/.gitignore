@@ -3,3 +3,4 @@ Properties
 appsettings.json
 appsettings.*.json
 game-servers.json
+!appsettings.example.json

@@ -31,24 +31,45 @@ Copy `config.example.json` to `config.json` (git ignores the copy) and set:
 | `content` | full path to `RCCService\content` |
 | `dockerDisabled` | `true` (Windows runs `RCCService.exe` directly, not Docker) |
 
-## 3. `appsettings.json`
+## 3. Website config
 
-Two keys that must agree, or joining fails with an authorization error:
+`appsettings.json` and `game-servers.json` are both gitignored, so a fresh clone has neither and the
+site will not start. Copy the examples:
 
-- `GameServerAuthorization` and `RccAuthorization` must be the **same string**, and that string must be
-  `authorization` in `config.json`. The website sends it to the game server, and the game server
-  injects it into every script as `AccessKey`, which the website then checks against `RccAuthorization`.
-
-And one section the join needs:
-
-```json
-"GameServers": [
-  { "ip": "127.0.0.1:5001", "domain": "127.0.0.1:53640", "maxServerCount": 10 }
-]
+```
+cd services\Roblox\Roblox.Website
+copy appsettings.example.json appsettings.json
+copy game-servers.example.json game-servers.json
 ```
 
-`ip` is the game server's HTTP API. `domain` is what the client is told to connect to, so it has to
-be the port RCC listens on.
+Then set the Postgres password and the `Directories` paths in `appsettings.json`.
+
+`Twitter:Bearer` only has to be non-empty: a blank value throws `Bad token` at startup and kills the
+site before it listens. It is only used by the social-link verification page, so any placeholder works
+locally. `Discord:SignupGateEnabled` set to `"false"` keeps signup open without linking a Discord
+account; delete the key to require the link again.
+
+Two keys must agree, or joining fails with an authorization error:
+
+- `GameServerAuthorization` and `RccAuthorization` must be the **same string**, and that string must be
+  `authorization` in the game server's `config.json`. The website sends it to the game server, and the
+  game server injects it into every script as `AccessKey`, which the website then checks against
+  `RccAuthorization`.
+
+`game-servers.json` is read by `Program.cs`, separately from `appsettings.json`. A `GameServers` block
+inside `appsettings.json` is ignored:
+
+```json
+{
+  "GameServers": [
+    { "ip": "127.0.0.1:5001", "domain": "127.0.0.1:53640", "maxServerCount": 10 }
+  ]
+}
+```
+
+`ip` is the game server's HTTP API and must match its `port` in `config.json`. `domain` is what the
+client is told to connect to, so it has to be the port RCC listens on. Both files are optional at
+startup now: with no `game-servers.json` the site reports no game servers instead of crashing.
 
 ## 4. RCC
 

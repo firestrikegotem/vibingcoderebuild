@@ -120,6 +120,10 @@ public class ApplicationWebsiteService : WebsiteService
                     {
                         throw new InvalidSocialMediaUrlException();
                     }
+                    catch (TwitterNotConfiguredException)
+                    {
+                        throw new Exception("Twitter verification is not available on this site.");
+                    }
 
                     // Maximum age of now - 10 years, minimum of now - 6 months
                     if (info.createdAt < DateTime.UtcNow.Subtract(TimeSpan.FromDays(365 * 10)) ||
