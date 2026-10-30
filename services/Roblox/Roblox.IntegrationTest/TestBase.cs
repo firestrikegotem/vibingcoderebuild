@@ -131,10 +131,16 @@ public class TestBase
 
     protected T ControllerAuth<T>(long userId) where T : ControllerBase, new()
     {
+        // The session hook only exists in debug builds, on purpose: production binaries should not
+        // carry a settable session. Release test builds get a controller with no signed-in user.
+#if DEBUG
         return new T()
         {
             userSessionForTests = new UserSession(userId, "username", DateTime.Now, AccountStatus.Ok, 1,
                 false, Guid.NewGuid().ToString()),
         };
+#else
+        return new T();
+#endif
     }
 }

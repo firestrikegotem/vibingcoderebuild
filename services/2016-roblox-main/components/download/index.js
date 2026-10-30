@@ -67,7 +67,7 @@ const Download = props => {
                             url={v.url}
                             title={v.title || v.name}
                             size={v.sizeInBytes ? formatSize(v.sizeInBytes) : undefined}
-                            imageUrl={v.imageUrl || '/img/bloxyn_logo.png'}
+                            imageUrl={v.imageUrl || '/img/bloxyn_icon.png'}
                         />
                     }))
             }

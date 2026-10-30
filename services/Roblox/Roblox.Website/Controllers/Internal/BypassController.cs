@@ -491,10 +491,19 @@ namespace Roblox.Website.Controllers
         }
 
         [HttpGet("login/negotiate.ashx"), HttpGet("login/negotiateasync.ashx")]
-        public Task Negotiate([Required, MVC.FromQuery] string suggest)
+        public async Task Negotiate([Required, MVC.FromQuery] string suggest)
         {
+            // Real Roblox answers this with the caller's security token, and the player then sends
+            // that token back on everything it does afterwards. Without a session there is nothing
+            // to hand out, so the body stays empty and the client falls back to the launch ticket.
             var domain = Request.Headers["rbxauthenticationnegotiation"].FirstOrDefault();
-            return Task.CompletedTask;
+            if (userSession == null) return;
+
+            var token = Request.Cookies[Middleware.SessionMiddleware.CookieName];
+            if (string.IsNullOrWhiteSpace(token)) return;
+
+            Response.ContentType = "text/plain";
+            await Response.WriteAsync(token);
         }
 
         [HttpGet("/auth/submit")]

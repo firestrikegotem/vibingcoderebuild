@@ -67,15 +67,16 @@ The join script in `BypassController.JoinGame` is the piece the client needs mos
 | Piece | Real Roblox | A revival |
 | --- | --- | --- |
 | Where the client goes for the launch script | `roblox.com` | This site: the `placelauncherurl` is `Configuration.BaseUrl + /placelauncher.ashx`, already correct |
-| Login | `Login/Negotiate.ashx` returns a security token | The endpoint exists but returns an empty body, so the client must take its identity from `-gameinfo` / `authenticationTicket`, which is what `retroArgs` provides |
+| Login | `Login/Negotiate.ashx` returns a security token | Same endpoint, answering with the caller's `.ROBLOSECURITY` token when a session exists. With no session it stays empty and the client falls back to `-gameinfo` / `authenticationTicket`, which is what `retroArgs` provides |
 | Asset and avatar URLs | `www.roblox.com` | `BaseUrl` in the join script, plus `/Asset/...` handled by `BypassController` |
 | Anything still hardcoded in the exe | - | Patch the strings in the exe, or map the Roblox domains to this server in the hosts file |
 | Client version | Always current | Must match the RCC build, and must speak the websocket join this join script describes |
 
 ## 4. Wiring the two exes you have
 
-1. Put the bootstrapper in `services/api/public/downloads/`. It shows up on the Download tab
-   automatically (`GET /apisite/download/v1/clients`).
+1. `Bloxyn.exe` is the bootstrapper and already ships in `services/api/public/downloads/`, so the
+   Download tab serves it (`GET /apisite/download/v1/clients`). Rebuild it with
+   `services/launcher/build.sh`; the source and its README are in `services/launcher/`.
 2. Run it once and confirm it registers `roblox-player` in the registry, pointing at itself with
    `-player "%1"`.
 3. Confirm the client folder it installs is the version your `services/RCCService` build expects.
@@ -90,7 +91,9 @@ The join script in `BypassController.JoinGame` is the piece the client needs mos
 
 ## 5. What is still missing here
 
-The exe files and the patched client are not in this repository, and the client strings have to be
-patched to point at your site rather than Roblox's, unless you run the whole thing behind a hosts
-file that maps the Roblox domains to your server. The Download tab, the endpoints it uses and the
-whole server half of the handshake are done.
+The player client itself is not in this repository, and its strings have to be patched to point at
+your site rather than Roblox's, unless you run the whole thing behind a hosts file that maps the
+Roblox domains to your server. `Bloxyn.exe` finds the client through `client.txt`, a `client\`
+folder next to itself, or the per-user `Versions` folders, so dropping the client in any of those
+is enough. The Download tab, the bootstrapper, the endpoints they use and the whole server half of
+the handshake are done.

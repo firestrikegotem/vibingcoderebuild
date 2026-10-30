@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Bloxyn.Launcher.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The launch URI logic is platform-neutral, so it is compiled in directly here. -->
+    <Compile Include="../LaunchUri.cs" />
+  </ItemGroup>
+
+</Project>
