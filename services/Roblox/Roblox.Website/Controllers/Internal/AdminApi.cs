@@ -2090,6 +2090,78 @@ Thank you for your understanding,
         };
     }
 
+    /// <summary>
+    /// Uploads a place (.rbxl) file from the admin panel. Without placeId this creates a new place and
+    /// its universe, so the game shows up on the site and can be joined. With placeId it saves the file
+    /// as a new version of that place.
+    /// </summary>
+    [HttpPost("place/upload"), StaffFilter(Access.CreateAsset)]
+    [RequestSizeLimit(104857600)]
+    public async Task<dynamic> UploadPlace([FromForm] UploadPlaceRequest request)
+    {
+        if (request.file == null || request.file.Length == 0)
+            throw new StaffException("No file specified");
+        if (request.file.Length > 100 * 1024 * 1024)
+            throw new StaffException("File is too large. The limit is 100 MB.");
+
+        await using (var checkStream = request.file.OpenReadStream())
+        {
+            var inspection = await Roblox.Services.PlaceFileInspector.Inspect(checkStream);
+            if (!inspection.IsPlaceFile)
+                throw new StaffException(inspection.Error ?? "That file is not a place (.rbxl) file.");
+        }
+
+        var ownerId = request.creatorId ?? safeUserSession.userId;
+
+        if (request.placeId != null)
+        {
+            var details = await services.assets.GetAssetCatalogInfo(request.placeId.Value);
+            if (details.assetType != Type.Place)
+                throw new StaffException("That asset is not a place.");
+            await using var versionContent = request.file.OpenReadStream();
+            var validation = await services.assets.ValidatePlaceFile(versionContent);
+            if (validation == false)
+                throw new StaffException("The place file did not pass validation.");
+            versionContent.Position = 0;
+            var version = await services.assets.CreateAssetVersion(request.placeId.Value, safeUserSession.userId,
+                versionContent);
+            long? universeId = null;
+            try
+            {
+                universeId = await services.games.GetUniverseId(request.placeId.Value);
+            }
+            catch (RecordNotFoundException)
+            {
+                universeId = null;
+            }
+
+            return new
+            {
+                placeId = version.assetId,
+                universeId = universeId,
+                isNew = false,
+            };
+        }
+
+        var name = string.IsNullOrWhiteSpace(request.name) ? "Place" : request.name.Trim();
+        await using var content = request.file.OpenReadStream();
+        var placeValidation = await services.assets.ValidatePlaceFile(content);
+        if (placeValidation == false)
+            throw new StaffException("The place file did not pass validation.");
+        content.Position = 0;
+
+        var created = await services.assets.CreateAsset(name, request.description, safeUserSession.userId,
+            CreatorType.User, ownerId, content, Type.Place, Genre.All, Models.Assets.ModerationStatus.ReviewApproved);
+        var universe = await services.games.CreateUniverse(created.assetId);
+
+        return new
+        {
+            placeId = created.assetId,
+            universeId = (long?) universe.universeId,
+            isNew = true,
+        };
+    }
+
     [HttpPost("asset/create"), StaffFilter(Access.CreateAsset)]
     public async Task<dynamic> CreateAsset([Required, FromForm] CreateAssetRequest request)
     {

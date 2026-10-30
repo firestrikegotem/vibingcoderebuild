@@ -195,6 +195,17 @@ public class MigrateItemAlternateRequest
     public bool disableRender { get; set; }
 }
 
+public class UploadPlaceRequest
+{
+    public string name { get; set; } = string.Empty;
+    public string? description { get; set; }
+    /// <summary>When set, the file is saved as a new version of this place instead of creating one.</summary>
+    public long? placeId { get; set; }
+    /// <summary>Owner of the new place. Defaults to the staff member uploading it.</summary>
+    public long? creatorId { get; set; }
+    public IFormFile? file { get; set; }
+}
+
 public class CreateAssetVersionRequest
 {
     public long assetId { get; set; }

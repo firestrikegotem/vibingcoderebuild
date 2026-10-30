@@ -18,6 +18,7 @@
 	import CreatePlayer from "./pages/CreatePlayer.svelte";
 	import CreateAssetForItem from "./pages/CreateAssetForItem.svelte";
 	import CreateAsset from "./pages/CreateAsset.svelte";
+	import UploadPlace from "./pages/UploadPlace.svelte";
 	import CreateAssetVersion from "./pages/CreateAssetVersion.svelte";
 	import AssetReRender from "./pages/AssetReRender.svelte";
 	import UpdateAssetProduct from "./pages/UpdateAssetProduct.svelte";
@@ -114,6 +115,9 @@ import ForceApplication from "./pages/ForceApplication.svelte";
 		</Route>
 		<Route path="/admin/asset/create">
 			<CreateAsset />
+		</Route>
+		<Route path="/admin/place/upload">
+			<UploadPlace />
 		</Route>
 		<Route path="/admin/asset/version/create">
 			<CreateAssetVersion />

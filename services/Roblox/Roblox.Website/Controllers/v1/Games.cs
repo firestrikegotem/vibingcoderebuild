@@ -7,7 +7,6 @@ using Roblox.Models.Assets;
 using Roblox.Models.Users;
 using Roblox.Services.Exceptions;
 using System.Linq;
-using Npgsql;
 
 namespace Roblox.Website.Controllers;
 
@@ -175,47 +174,57 @@ public class GamesControllerV1 : ControllerBase
     [HttpPost("games/create")]
     public async Task<dynamic> CreateGame([FromBody] CreateGameRequest request)
     {
-        // Use RobloxException to avoid the int/string argument error
-        if (userSession == null) throw new RobloxException(401, 0, "Unauthorized");
+        var userId = safeUserSession.userId;
         if (string.IsNullOrWhiteSpace(request.name)) throw new RobloxException(400, 0, "Name is required");
+        var name = request.name.Trim();
+        if (name.Length > 50) name = name[..50];
 
-        // Connect directly to the database using your credentials
-        var connString = "Host=127.0.0.1; Database=ecsrev; Password=1Mosher1334*; Username=postgres; Maximum Pool Size=20";
-        using var conn = new NpgsqlConnection(connString);
-        await conn.OpenAsync();
+        if (!await services.cooldown.TryIncrementBucketCooldown("CreateGameV1_Day:" + userId, 25, TimeSpan.FromDays(1)))
+            throw new RobloxException(429, 0, "You have created too many games today. Try again tomorrow.");
 
-        // 1. Create Asset (Place)
-        using var cmdAsset = new NpgsqlCommand(
-            "INSERT INTO asset (name, asset_type, asset_genre, creator_type, creator_id, moderation_status) VALUES (@name, 9, 0, 1, @creatorId, 1) RETURNING id", conn);
-        cmdAsset.Parameters.AddWithValue("name", request.name);
-        cmdAsset.Parameters.AddWithValue("creatorId", userSession.userId);
-        var placeId = (long)(await cmdAsset.ExecuteScalarAsync())!;
+        // Prefer to start the new game from the template the creator picked (a baseplate or one of
+        // their own games). If the template can't be copied we still create a playable baseplate place
+        // instead of failing the request.
+        long? placeId = null;
+        if (request.templatePlaceId > 0)
+            placeId = await CopyPlaceContent(userId, request.templatePlaceId, name);
+        if (placeId == null)
+        {
+            var place = await services.assets.CreatePlace(userId, Models.Assets.CreatorType.User, userId);
+            placeId = place.placeId;
+        }
 
-        // 2. Create Asset Version
-        using var cmdVer = new NpgsqlCommand(
-            "INSERT INTO asset_version (asset_id, version_number, creator_id, content_url) VALUES (@assetId, 1, @creatorId, @contentUrl) ON CONFLICT DO NOTHING", conn);
-        cmdVer.Parameters.AddWithValue("assetId", placeId);
-        cmdVer.Parameters.AddWithValue("creatorId", userSession.userId);
-        cmdVer.Parameters.AddWithValue("contentUrl", $"http://127.0.0.1:5000/asset/?id={placeId}");
-        await cmdVer.ExecuteNonQueryAsync();
-
-        // 3. Create Asset Place Settings
-        using var cmdPlace = new NpgsqlCommand(
-            "INSERT INTO asset_place (asset_id, vip_price) VALUES (@assetId, 0) ON CONFLICT DO NOTHING", conn);
-        cmdPlace.Parameters.AddWithValue("assetId", placeId);
-        await cmdPlace.ExecuteNonQueryAsync();
-
-        // 4. Create Universe
-        using var cmdUniverse = new NpgsqlCommand(
-            "INSERT INTO universe (root_asset_id, creator_id, creator_type, is_public) VALUES (@placeId, @creatorId, 1, true) RETURNING id", conn);
-        cmdUniverse.Parameters.AddWithValue("placeId", placeId);
-        cmdUniverse.Parameters.AddWithValue("creatorId", userSession.userId);
-        var universeId = (long)(await cmdUniverse.ExecuteScalarAsync())!;
+        var universe = await services.games.CreateUniverse(placeId.Value);
 
         return new
         {
-            universeId = universeId,
-            placeId = placeId
+            universeId = universe.universeId,
+            placeId = placeId.Value,
         };
+    }
+
+    /// <summary>
+    /// Copies the latest place file of an existing place into a new place owned by userId.
+    /// Returns null when the template does not exist or has no file, so the caller can fall back.
+    /// </summary>
+    private async Task<long?> CopyPlaceContent(long userId, long templatePlaceId, string name)
+    {
+        try
+        {
+            var details = await services.assets.GetAssetCatalogInfo(templatePlaceId);
+            if (details.assetType != Models.Assets.Type.Place) return null;
+            var version = await services.assets.GetLatestAssetVersion(templatePlaceId);
+            if (string.IsNullOrEmpty(version.contentUrl)) return null;
+            await using var content = await services.assets.GetAssetContent(version.contentUrl);
+            var created = await services.assets.CreateAsset(name, null, userId, Models.Assets.CreatorType.User,
+                userId, content, Models.Assets.Type.Place, Models.Assets.Genre.All,
+                Models.Assets.ModerationStatus.ReviewApproved);
+            return created.assetId;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine("[warn] could not copy place template " + templatePlaceId + ": " + e.Message);
+            return null;
+        }
     }
 }

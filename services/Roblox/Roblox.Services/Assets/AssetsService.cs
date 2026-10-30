@@ -246,6 +246,36 @@ public class AssetsService : ServiceBase, IService
         return false;
     }
 
+    /// <summary>
+    /// Asks the asset validation service whether a place file is a real place (.rbxl) file.
+    /// Returns true when the file is valid, false when the service rejected it, and null when
+    /// the service could not be reached so the caller can decide what to do next.
+    /// </summary>
+    public async Task<bool?> ValidatePlaceFile(Stream file)
+    {
+        Writer.Info(LogGroup.AssetValidation, "validating place file");
+        try
+        {
+            var s = new StreamContent(file);
+            s.Headers.Add("robloxAuthorization", Configuration.AssetValidationServiceAuthorization);
+            var url = Configuration.AssetValidationServiceUrl + "/api/v1/validate-place";
+            var response = await assetValidationClient.PostAsync(url, s);
+            if (!response.IsSuccessStatusCode)
+            {
+                Writer.Info(LogGroup.AssetValidation, "place validation service returned {0}", response.StatusCode);
+                return null;
+            }
+
+            var result = JsonSerializer.Deserialize<AssetValidationResponse>(await response.Content.ReadAsStringAsync());
+            return result is { isValid: true };
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetValidation, "place validation service unreachable. message = {0}", e.Message);
+            return null;
+        }
+    }
+
     public async Task<Imager?> ValidateImage(Stream content)
     {
         var imageData = await Imager.ReadAsync(content);

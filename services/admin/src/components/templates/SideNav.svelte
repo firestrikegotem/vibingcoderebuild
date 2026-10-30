@@ -158,6 +158,11 @@
 						<a use:link class="nav-link" href="/admin/asset/create"><FilePlusIcon /> Create Item</a>
 					</li>
 				{/if}
+				{#if rank.hasPermission("CreateAsset")}
+					<li class="nav-item ml-4">
+						<a use:link class="nav-link" href="/admin/place/upload"><UploadCloudIcon /> Upload Place</a>
+					</li>
+				{/if}
 				{#if rank.hasPermission("CreateAssetCopiedFromRoblox")}
 					<li class="nav-item ml-4">
 						<a use:link class="nav-link" href="/admin/asset/copy"><CopyIcon /> Copy Asset</a>
