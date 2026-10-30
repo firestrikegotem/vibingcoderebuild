@@ -4,7 +4,7 @@ local http = game:GetService("HttpService");
 http.HttpEnabled = false;
 
 -- begin dynamiclly edited
-local url = "https://economy-simulator.org";
+local url = "http://127.0.0.1:5000";
 local port = 64989;
 local placeId = 5;
 local creatorType = Enum.CreatorType.User;
