@@ -17,8 +17,11 @@ var domain = AppDomain.CurrentDomain;
 // Set a timeout interval of 5 seconds.
 domain.SetData("REGEX_DEFAULT_MATCH_TIMEOUT", TimeSpan.FromSeconds(5));
 
+// Environment variables are added last so a deployment can override any value in appsettings.json
+// without editing the file (Postgres, Directories, and so on).
 IConfiguration configuration = new ConfigurationBuilder()
     .AddJsonFile("appsettings.json")
+    .AddEnvironmentVariables()
     .Build();
 
 var builder = WebApplication.CreateBuilder(args);

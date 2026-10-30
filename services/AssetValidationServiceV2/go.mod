@@ -2,14 +2,16 @@ module AssetValidationV2
 
 go 1.18
 
-require github.com/gofiber/fiber/v2 v2.36.0
+require (
+	github.com/gofiber/fiber/v2 v2.36.0
+	github.com/robloxapi/rbxfile v0.6.3
+)
 
 require (
 	github.com/anaminus/parse v0.2.0 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/bkaradzic/go-lz4 v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.0 // indirect
-	github.com/robloxapi/rbxfile v0.6.3 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.38.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
