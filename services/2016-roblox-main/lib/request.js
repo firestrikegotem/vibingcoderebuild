@@ -2,8 +2,13 @@ import axios from 'axios';
 import config from '../lib/config';
 let _csrf = '';
 
-// HARDCODED BACKEND URL
-const BACKEND_URL = 'http://localhost:5000';
+// In the browser the site is served from the same origin as the backend (the .NET site
+// proxies to this frontend), so relative URLs are correct. Server-side rendering talks to
+// the backend on loopback. Override with BACKEND_URL / NEXT_PUBLIC_BACKEND_URL if you split
+// the frontend onto its own host.
+const SERVER_BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:5000';
+const BROWSER_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+const BACKEND_URL = typeof window === 'undefined' ? SERVER_BACKEND_URL : BROWSER_BACKEND_URL;
 
 const getFullUrl = (apiSite, fullUrl) => {
   return `${BACKEND_URL}/apisite/${apiSite}${fullUrl}`;

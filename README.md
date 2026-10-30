@@ -7,6 +7,11 @@ Economy Simulator is a ROBLOX revival that allows you to Relive Roblox 2016.
 
 # HOW TO RUN/BUILD/COMPILE
 
+Running this on your own domain? Follow [docs/deploy.md](docs/deploy.md) instead of this
+section - it covers DNS, TLS, config values, service autostart and the go-live checklist.
+The steps below are for a local development setup.
+
+
 You will need the following dependencies:
 - Windows + WSL or Linux (Currently Windows is more recommended and is easier)
 - PostgreSQL (Version 13+)

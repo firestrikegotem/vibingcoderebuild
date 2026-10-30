@@ -62,6 +62,7 @@ Roblox.Configuration.JsonDataDirectory = ResolveDirectory("JsonData", "../Roblox
 Roblox.Configuration.AdminBundleDirectory = ResolveDirectory("AdminBundle", "../../admin/public/");
 Roblox.Configuration.EconomyChatBundleDirectory = ResolveDirectory("EconomyChatBundle", "../../economy-chat/build/");
 Roblox.Configuration.BaseUrl = configuration.GetSection("BaseUrl").Value;
+Roblox.Configuration.GameServerDomain = configuration.GetSection("GameServerDomain").Value;
 Roblox.Configuration.HCaptchaPublicKey = configuration.GetSection("HCaptcha:Public").Value;
 Roblox.Configuration.HCaptchaPrivateKey = configuration.GetSection("HCaptcha:Private").Value;
 // Loud on startup, because "captcha silently off" is the difference between a working and a

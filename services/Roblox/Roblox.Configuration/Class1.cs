@@ -81,5 +81,15 @@ public static class Configuration
         }
     }
 
-    public static string GameServerDomain => "gameserver.com"; // set to your game server's domain
+    private static string? _GameServerDomain { get; set; }
+
+    /// <summary>
+    /// Domain suffix used to build per-server join addresses (gs1-1.example.com). Comes from the
+    /// GameServerDomain setting; the upstream default only makes sense for local testing.
+    /// </summary>
+    public static string GameServerDomain
+    {
+        get => string.IsNullOrWhiteSpace(_GameServerDomain) ? "gameserver.com" : _GameServerDomain!;
+        set => _GameServerDomain = value;
+    }
 }
