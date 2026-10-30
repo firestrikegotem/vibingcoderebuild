@@ -1,0 +1,16 @@
+{
+  "_comment": "Copy this to config.json (git ignores it) and fill in the two keys. Both must match the website's appsettings.json: authorization is checked against GameServerAuthorization *and* injected into the game scripts as the RCC accessKey, which the website compares to RccAuthorization, so GameServerAuthorization and RccAuthorization must be the same string.",
+
+  "authorization": "shared-game-server-and-rcc-key",
+  "websiteBotAuth": "same-as-BotAuthorization-in-appsettings",
+  "baseUrl": "http://127.0.0.1:5000",
+
+  "port": 5001,
+  "rccPort": 53640,
+  "thumbnailWebsocketPort": 5002,
+
+  "rcc": "C:\\path\\to\\services\\RCCService\\",
+  "content": "C:\\path\\to\\services\\RCCService\\content",
+
+  "dockerDisabled": true
+}

@@ -1,2 +1,3 @@
-cd "C:\Users\lannu\Desktop\ecs\services\game-server"
+@echo off
+cd /d "%~dp0"
 npm run start

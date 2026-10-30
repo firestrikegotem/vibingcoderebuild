@@ -56,8 +56,13 @@ const isPortAvailable = (port: number): Promise<boolean> => {
 	});
 }
 
+// Must stay in step with GameServerPorts in Roblox.Services/Games/GameServer.cs: the website tells
+// the client to connect to 127.0.0.1:53640, so RCC has to be the process listening there.
+const RCC_PORT_MIN = 53640;
+const RCC_PORT_MAX = 53650;
+
 const getFreeRccPort = async (): Promise<number> => {
-	for (let i = 64989; i < 64990; i++) {
+	for (let i = RCC_PORT_MIN; i < RCC_PORT_MAX; i++) {
 		let avail = await isPortAvailable(i);
 		console.log('[info] port available?',i,avail);
 		if (avail) {
@@ -236,9 +241,11 @@ export default class CommandHandler extends StdExceptions {
 		const dockerPidFileLocation = path.join(__dirname, '../../rcccid-' + portToRunOn);
 		let rccCid: string|undefined;
 		if (!dockerEnabled) {
-			const rccPath = conf.rcc || path.join(__dirname, 'C:\\Users\\Mark\\Desktop\\ch2\\economysimulator\\src\\services\\RCCService\\');
+			// Default to the RCC folder that sits next to the other services, so a checkout works
+			// without editing config.json. Events waiting for players use conf.rcc when set.
+			const rccPath = conf.rcc || path.join(__dirname, '../../../RCCService') + path.sep;
 			const rccExecutable = rccPath + (os.platform() === 'win32' ? 'RCCService.exe' : 'rcc');
-			rcc = cp.spawn(rccExecutable, ['-Console', '-PlaceId:1818', "-port 64989", '-Content', conf.content || path.join(rccPath, './content/')], {
+			rcc = cp.spawn(rccExecutable, ['-Console', '-PlaceId:1818', '-port', portToRunOn.toString(), '-Content', conf.content || path.join(rccPath, './content/')], {
 				cwd: rccPath,
 				stdio: 'pipe',
 			});

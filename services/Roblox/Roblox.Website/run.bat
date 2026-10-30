@@ -1,2 +1,3 @@
-cd C:\Users\lannu\Desktop\ecs\services\Roblox\Roblox.Website
+@echo off
+cd /d "%~dp0"
 dotnet run --configuration Release

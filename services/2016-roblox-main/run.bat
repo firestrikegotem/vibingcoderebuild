@@ -1,2 +1,3 @@
-cd C:\Users\lannu\Desktop\ecs\services\2016-roblox-main
+@echo off
+cd /d "%~dp0"
 npm run start
