@@ -12,7 +12,11 @@ interface IWebsiteConfiguration {
 	websiteBotAuth: string;
 }
 
-const conf: Readonly<IWebsiteConfiguration> = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '../../config.json')).toString())
+// Strip a UTF-8 BOM before parsing: PowerShell's Set-Content -Encoding UTF8 writes one, and
+// JSON.parse then dies with "Unexpected token '\ufeff'" pointing at a file that looks fine.
+const rawConfig = require('fs').readFileSync(require('path').join(__dirname, '../../config.json')).toString().replace(/^\uFEFF/, '');
+
+const conf: Readonly<IWebsiteConfiguration> = JSON.parse(rawConfig)
 export default conf;
 
 assert(typeof conf.authorization, 'string');
