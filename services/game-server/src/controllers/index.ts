@@ -357,6 +357,9 @@ export default class CommandHandler extends StdExceptions {
 		try {
 			await this.waitForRcc(game, portToRunOn);
 		}catch(e) {
+			// Release the reservation we took for this attempt, otherwise the next render
+			// thinks the port is still in use and stalls for a minute before trying again.
+			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
 			if (game.rccReference) {
 				game.rccReference.close();
 			}
@@ -397,7 +400,7 @@ export default class CommandHandler extends StdExceptions {
 			try {
 				const result = await axiosClient.request({
 					method: 'GET',
-					url: '127.0.0.1' + port + '/',
+					url: 'http://127.0.0.1:' + port + '/',
 					headers: {
 						'Content-Type': 'text/xml; charset=utf-8',
 					},
