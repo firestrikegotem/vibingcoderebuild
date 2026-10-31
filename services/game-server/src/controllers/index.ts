@@ -542,16 +542,13 @@ export default class CommandHandler extends StdExceptions {
 	private soapDiagnostics = new Set<string>();
 
 	private createBatchJobRequest(jobId: string, lua: string): string {
+		// BatchJobEx takes the job id as a plain string, not a job struct like OpenJobEx does.
+		// Sending a job struct here is what RCC answered with a 500 and an empty body.
 		return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <BatchJobEx xmlns="http://roblox.com/">
-        <job>
-            <id>${jobId}</id>
-            <category>0</category>
-            <cores>1</cores>
-            <expirationInSeconds>43200</expirationInSeconds>
-        </job>
+    <BatchJobEx xmlns="http://roblox.com/" jobID="${jobId}">
+        <jobID>${jobId}</jobID>
         <script>
             <name>BloxynRenderResult</name>
             <script>
@@ -604,7 +601,11 @@ export default class CommandHandler extends StdExceptions {
 		const raw = typeof res.data === 'string' ? res.data : '';
 		if (!this.soapDiagnostics.has(jobId)) {
 			this.soapDiagnostics.add(jobId);
-			console.log('[debug] soap reply', res.status, JSON.stringify(raw.substring(0, 400)));
+			const fault = /<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i.exec(raw);
+			const detail = fault
+				? 'fault: ' + JSON.stringify(fault[1].substring(0, 300))
+				: JSON.stringify(raw.substring(Math.max(0, raw.length - 300)));
+			console.log('[debug] soap reply', res.status, detail);
 		}
 		if (!raw || raw.indexOf('Fault') !== -1)
 			return null;
