@@ -59,7 +59,11 @@ namespace Roblox.Rendering
 
                     var msg = Encoding.UTF8.GetString(memory.Memory.Span.Slice(0, result.Count));
 
-                    Console.WriteLine("got ws message. result={0}", msg.Substring(0,75)+"...");
+                    // Substring(0, 75) threw on any message shorter than that, which happens with
+                    // error responses. That exception killed the listener mid-render, so the image
+                    // that had just arrived was never handed to its waiting caller.
+                    var preview = msg.Length > 75 ? msg.Substring(0, 75) + "..." : msg;
+                    Console.WriteLine("got ws message. result={0}", preview);
                     var decoded = JsonSerializer.Deserialize<RenderResponse<string>>(msg);
                     if (decoded == null)
                     {
@@ -99,10 +103,12 @@ namespace Roblox.Rendering
                         mux.ReleaseMutex();
                     }
                 }
-                catch (System.Exception e)
+                catch (System.Exception e) when (e is not OperationCanceledException)
                 {
-                    Console.WriteLine("Got error in ws connection {0}", e.Message);
-                    throw;
+                    // A bad or unexpected message must not tear down the socket: the next one may be
+                    // the render result we are waiting for.
+                    Console.WriteLine("[warning] could not handle render ws message: {0}", e.Message);
+                    await Task.Delay(100);
                 }
             }
         }
