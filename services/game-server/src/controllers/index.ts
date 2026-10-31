@@ -538,6 +538,9 @@ export default class CommandHandler extends StdExceptions {
 	 * BatchJobEx runs a script inside an already-open job and returns whatever the script
 	 * returns. Used to read a render result back when RCC cannot upload it itself.
 	 */
+	/** One raw SOAP reply per job, so a rejected BatchJobEx is visible in the console. */
+	private soapDiagnostics = new Set<string>();
+
 	private createBatchJobRequest(jobId: string, lua: string): string {
 		return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -599,6 +602,10 @@ export default class CommandHandler extends StdExceptions {
 			timeout: 30 * 1000,
 		});
 		const raw = typeof res.data === 'string' ? res.data : '';
+		if (!this.soapDiagnostics.has(jobId)) {
+			this.soapDiagnostics.add(jobId);
+			console.log('[debug] soap reply', res.status, JSON.stringify(raw.substring(0, 400)));
+		}
 		if (!raw || raw.indexOf('Fault') !== -1)
 			return null;
 		const decoded = this.decodeXmlText(raw);
