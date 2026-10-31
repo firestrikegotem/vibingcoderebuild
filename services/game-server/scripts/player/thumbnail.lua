@@ -11,7 +11,9 @@ local HttpService = game:GetService("HttpService");
 local ThumbnailGenerator = game:GetService('ThumbnailGenerator');
 local Players = game:GetService("Players");
 game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false);
-game:GetService('ThumbnailGenerator').GraphicsMode = 2;
+-- 2 asks RCC for a graphics backend this build does not have, and the click crashes the
+-- process. 4 is what the headshot script uses (and Roblox treats it as "let RCC decide").
+game:GetService('ThumbnailGenerator').GraphicsMode = 4;
 HttpService.HttpEnabled = true;
 ScriptContext.ScriptsDisabled = true
 Lighting.Outlines = false
@@ -178,7 +180,7 @@ end
         else
             print("[warn] no head on the character, rendering with whatever camera the place has")
         end
-        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, false)
+        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, true)
         print("[debug] avatar render over. delete character")
         Player.Character:Destroy()
         print("[debug] [player/thumbnail] send post request containing avatar")
