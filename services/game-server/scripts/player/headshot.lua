@@ -55,7 +55,9 @@ end
     local ContentProvider = game:GetService('ContentProvider')
     local ThumbnailGenerator = game:GetService('ThumbnailGenerator')
     game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
-    ThumbnailGenerator.GraphicsMode = 4; -- switch to 4 (apparently noop but all roblox code has this line so...)
+    -- 3 is the software OpenGL backend (OSMesa32.dll ships with the RCC build).
+    ThumbnailGenerator.GraphicsMode = 3;
+    print('[debug] graphics mode', ThumbnailGenerator.GraphicsMode);
 
     HttpService.HttpEnabled = true
     ScriptContext.ScriptsDisabled = true

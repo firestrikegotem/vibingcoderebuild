@@ -13,7 +13,12 @@ local Players = game:GetService("Players");
 game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false);
 -- 2 asks RCC for a graphics backend this build does not have, and the click crashes the
 -- process. 4 is what the headshot script uses (and Roblox treats it as "let RCC decide").
-game:GetService('ThumbnailGenerator').GraphicsMode = 4;
+-- 3 is the software OpenGL backend; OSMESA32.dll ships with this RCC build.
+-- 4 means "no graphics context", and ThumbnailGenerator:Click then dies with
+-- StartProcessException right after "thumbnail camera ready".
+local _thumbGen = game:GetService('ThumbnailGenerator');
+_thumbGen.GraphicsMode = 3;
+print('[debug] graphics mode', _thumbGen.GraphicsMode);
 HttpService.HttpEnabled = true;
 ScriptContext.ScriptsDisabled = true
 Lighting.Outlines = false
