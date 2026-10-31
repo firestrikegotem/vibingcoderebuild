@@ -252,14 +252,33 @@ export default class CommandHandler extends StdExceptions {
 		if (!dockerEnabled) {
 			// Default to the RCC folder that sits next to the other services, so a checkout works
 			// without editing config.json. Events waiting for players use conf.rcc when set.
-			const rccPath = conf.rcc || path.join(__dirname, '../../../RCCService') + path.sep;
+			// path.resolve drops any trailing separator a config value may carry: a current
+			// directory ending in "\" is passed straight to CreateProcess on Windows and is a
+			// classic source of "spawn EFTYPE" complaints.
+			const rccPath = path.resolve(conf.rcc || path.join(__dirname, '../../../RCCService'));
 			const rccExecutableName = os.platform() === 'win32' ? 'RCCService.exe' : 'rcc';
-			const rccExecutable = rccPath + rccExecutableName;
+			const rccExecutable = path.join(rccPath, rccExecutableName);
+			const rccArgs = ['-Console', '-PlaceId:1818', '-port', portToRunOn.toString(), '-Content', conf.content || path.join(rccPath, 'content')];
 			rccTarget = rccExecutable;
-			rcc = cp.spawn(rccExecutable, ['-Console', '-PlaceId:1818', '-port', portToRunOn.toString(), '-Content', conf.content || path.join(rccPath, './content/')], {
-				cwd: rccPath,
-				stdio: 'pipe',
-			});
+			try {
+				rcc = cp.spawn(rccExecutable, rccArgs, {
+					cwd: rccPath,
+					stdio: 'pipe',
+				});
+			} catch (spawnError) {
+				const code = (spawnError as NodeJS.ErrnoException)?.code;
+				// libuv reports ERROR_BAD_EXE_FORMAT as EFTYPE, and on Windows a direct spawn is
+				// refused for some perfectly good binaries. cmd.exe can start the same file, so
+				// retry through it rather than failing the render outright.
+				if (os.platform() !== 'win32' || code !== 'EFTYPE') throw spawnError;
+				console.log('[warning] direct spawn of RCC returned EFTYPE, retrying through cmd.exe:', rccExecutable);
+				const quoted = '"' + rccExecutable + '" ' + rccArgs.map(a => /\s/.test(a) ? '"' + a + '"' : a).join(' ');
+				rcc = cp.spawn('cmd.exe', ['/d', '/s', '/c', quoted], {
+					cwd: rccPath,
+					stdio: 'pipe',
+					windowsVerbatimArguments: true,
+				});
+			}
 		}else{
 			try {
 				fs.unlinkSync(dockerPidFileLocation);
@@ -755,10 +774,17 @@ export default class CommandHandler extends StdExceptions {
 			},
 		} as IGameEntry;
 		let start = Date.now();
-		await this.startRcc(game);
+		// A render request must never take the whole game server down: if RCC cannot start, fail
+		// this job with an explanation so the website can show it.
+		try {
+			await this.startRcc(game);
+		} catch (e) {
+			await this.closeGame(id);
+			throw new Error('Could not start RCC for render: ' + (e as Error)?.message);
+		}
 		if (!game.rccReference) {
-			console.error('undefined RCC reference');
-			process.exit(1);
+			await this.closeGame(id);
+			throw new Error(game.rccFailureReason || 'RCC did not start for render');
 		}
 		this.RenderRcc.push(game);
 		console.log('[info] started a new RCC instance for renders. time =',(Date.now()-start),'ms');
@@ -771,9 +797,9 @@ export default class CommandHandler extends StdExceptions {
 
 	private async runJobQueueTask(rcc: IGameEntry, job: IQueueEntry) {
 		if (!rcc || !rcc.rccReference) {
-			// fatal error
-			console.error('fatal','RCC reference is not available - it was probably closed', new Error().stack);
-			process.exit(1);
+			// Skip the job instead of exiting: one dead RCC should not stop every later render.
+			console.error('[error] RCC reference is not available - it was probably closed, skipping job', job.jobId);
+			return;
 		}
 		// send request
 		const result = await axiosClient.request({
