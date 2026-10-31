@@ -29,6 +29,7 @@ namespace Roblox.Website.Controllers
                 Console.WriteLine("[info] add to bypass {0}", toAdd);
                 FrontendProxyMiddleware.BypassUrls.Add(toAdd);
                 ApplicationGuardMiddleware.allowedUrls.Add(toAdd);
+                ApplicationGuardMiddleware.AllowBlockedUserAgent(toAdd);
                 CsrfMiddleware.bypassUrls.Add(toAdd);
             }
         }

@@ -250,12 +250,21 @@ public class ApplicationGuardMiddleware
         return false;
     }
 
-    private readonly string[] allowedPathsForBlockUserAgents = new[]
+    // Paths that machine clients (RCC, game servers, scripts) may use even though their
+    // user agent would normally be sent to the captcha page.
+    private static readonly List<string> allowedPathsForBlockUserAgents = new()
     {
         "",
         "/auth/home",
         "/auth/captcha",
     };
+
+    public static void AllowBlockedUserAgent(string path)
+    {
+        var normalized = path.ToLower();
+        if (!allowedPathsForBlockUserAgents.Contains(normalized))
+            allowedPathsForBlockUserAgents.Add(normalized);
+    }
 
     private async Task Redirect(HttpContext ctx, string dest)
     {
