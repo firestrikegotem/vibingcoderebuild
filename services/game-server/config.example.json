@@ -9,8 +9,9 @@
   "rccPort": 53640,
   "thumbnailWebsocketPort": 5002,
 
-  "rcc": "C:\\path\\to\\services\\RCCService\\",
-  "content": "C:\\path\\to\\services\\RCCService\\content",
+  "_rccComment": "Leave rcc/content empty to use the RCCService folder next to the other services (services/RCCService). Only set them if RCC lives somewhere else; use doubled backslashes on Windows.",
+  "rcc": "",
+  "content": "",
 
   "dockerDisabled": true
 }
