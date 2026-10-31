@@ -190,13 +190,19 @@ export default class CommandHandler extends StdExceptions {
 	}
 
 	private onStartup() {
-		const rccStopPath = path.join(__dirname, '../../stop-all-rcc.sh');
-		// On startup, we need to kill any running RCC instances - they're probably leftover from a server crash or something.
+		// Kill any RCC instances left behind by a crash or a previous run. Linux uses the sudo
+		// helper script; Windows has no sudo and spawnSync returns null streams there, which used
+		// to throw a confusing "cannot read properties of undefined" at every startup.
 		try {
-			let stopRequest = cp.spawnSync('/usr/bin/sudo', [
-				rccStopPath
-			]);
-			console.log('[info] result for stopping rcc',stopRequest.stdout.toString(),stopRequest.status, stopRequest.stderr.toString());
+			if (os.platform() === 'win32') {
+				const result = cp.spawnSync('taskkill', ['/IM', 'RCCService.exe', '/F']);
+				const output = ((result.stdout?.toString() ?? '') + (result.stderr?.toString() ?? '')).trim();
+				console.log('[info] result for stopping rcc', output || 'no leftover RCC processes', result.status ?? 'n/a');
+				return;
+			}
+			const rccStopPath = path.join(__dirname, '../../stop-all-rcc.sh');
+			const stopRequest = cp.spawnSync('/usr/bin/sudo', [rccStopPath]);
+			console.log('[info] result for stopping rcc', stopRequest.stdout?.toString() ?? '', stopRequest.status ?? 'n/a', stopRequest.stderr?.toString() ?? '');
 		}catch(e) {
 			console.log('[error] error in OnStartup - could not shut down existing RCC instances (probably not fatal):',e);
 		}
