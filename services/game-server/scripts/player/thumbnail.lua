@@ -184,14 +184,28 @@ end
         print("[debug] avatar render over. delete character")
         Player.Character:Destroy()
         print("[debug] [player/thumbnail] send post request containing avatar")
+        local payload = HttpService:JSONEncode({
+            ['thumbnail'] = avatarEncoded,
+            ['userId'] = userId,
+            ['accessKey'] = "AccessKey",
+            ['type'] = "PlayerThumbnail",
+            ['jobId'] = jobId,
+        })
+        -- Park the finished image on the job as well. Some RCC builds refuse every
+        -- outbound HTTP request (TrustCheck), which leaves the render stuck forever at
+        -- the post below. The game server reads this value back over SOAP instead.
+        pcall(function()
+            _G.__bloxynThumbnail = payload
+            local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")
+            if holder == nil then
+                holder = Instance.new("StringValue")
+                holder.Name = "__BloxynThumbnail"
+                holder.Parent = game:GetService("ServerStorage")
+            end
+            holder.Value = payload
+        end)
         local ok, data = pcall(function()
-            return HttpService:PostAsync(uploadURL, HttpService:JSONEncode({
-                ['thumbnail'] = avatarEncoded,
-                ['userId'] = userId,
-                ['accessKey'] = "AccessKey",
-                ['type'] = "PlayerThumbnail",
-                ['jobId'] = jobId,
-            }), Enum.HttpContentType.TextPlain)
+            return HttpService:PostAsync(uploadURL, payload, Enum.HttpContentType.TextPlain)
         end)
         print("[debug] post over",ok,data)
     end

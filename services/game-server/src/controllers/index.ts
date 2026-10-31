@@ -76,7 +76,7 @@ import getScripts from '../scripts';
 const scripts = getScripts();
 
 import axiosStatic from 'axios';
-import { awaitResult, doesCallbackExist, getResult, resolutionMultiplier } from '../rendering';
+import { awaitResult, doesCallbackExist, getUploadCallbacks, getResult, resolutionMultiplier } from '../rendering';
 import { addMessage } from '../discord';
 const axiosClient = axiosStatic.create({
 	headers: {
@@ -534,6 +534,145 @@ export default class CommandHandler extends StdExceptions {
 		}
 	}
 
+	/**
+	 * BatchJobEx runs a script inside an already-open job and returns whatever the script
+	 * returns. Used to read a render result back when RCC cannot upload it itself.
+	 */
+	private createBatchJobRequest(jobId: string, lua: string): string {
+		return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <BatchJobEx xmlns="http://roblox.com/">
+        <job>
+            <id>${jobId}</id>
+            <category>0</category>
+            <cores>1</cores>
+            <expirationInSeconds>43200</expirationInSeconds>
+        </job>
+        <script>
+            <name>BloxynRenderResult</name>
+            <script>
+			<![CDATA[
+			${lua}
+			]]>
+			</script>
+        </script>
+    </BatchJobEx>
+  </soap:Body>
+</soap:Envelope>`;
+	}
+
+	private decodeXmlText(input: string): string {
+		return input
+			.replace(/&lt;/g, '<')
+			.replace(/&gt;/g, '>')
+			.replace(/&quot;/g, '"')
+			.replace(/&#34;/g, '"')
+			.replace(/&apos;/g, "'")
+			.replace(/&#39;/g, "'")
+			.replace(/&amp;/g, '&');
+	}
+
+	/**
+	 * The render scripts park their finished payload on the job, so it can be collected here
+	 * even when the script's own HTTP upload never completes. Returns null while the render is
+	 * still running, or when this RCC build does not support BatchJobEx.
+	 */
+	private async readJobRenderResult(port: number, jobId: string): Promise<string | null> {
+		const lua = [
+			'local ok, value = pcall(function()',
+			'    local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")',
+			'    if holder ~= nil and holder.Value ~= "" then return holder.Value end',
+			'    return _G.__bloxynThumbnail',
+			'end)',
+			'if not ok or type(value) ~= "string" then return "" end',
+			'return value',
+		].join('\n');
+		const res = await axiosClient.request({
+			method: 'POST',
+			url: 'http://127.0.0.1:' + port + '/',
+			headers: {
+				'Content-Type': 'text/xml; charset=utf-8',
+			},
+			data: this.createBatchJobRequest(jobId, lua),
+			validateStatus: () => true,
+			timeout: 30 * 1000,
+		});
+		const raw = typeof res.data === 'string' ? res.data : '';
+		if (!raw || raw.indexOf('Fault') !== -1)
+			return null;
+		const decoded = this.decodeXmlText(raw);
+		const key = decoded.indexOf('"thumbnail"');
+		if (key === -1)
+			return null;
+		const start = decoded.lastIndexOf('{', key);
+		const end = decoded.indexOf('}', key);
+		if (start === -1 || end === -1)
+			return null;
+		return decoded.substring(start, end + 1);
+	}
+
+	/** Hand a collected payload to whoever waits for this job, exactly like the HTTP upload. */
+	private deliverJobResult(jobId: string, json: string): boolean {
+		let parsed: any;
+		try {
+			parsed = JSON.parse(json);
+		} catch (e) {
+			return false;
+		}
+		if (!parsed || typeof parsed.thumbnail !== 'string')
+			return false;
+		const callbacks = getUploadCallbacks()[jobId];
+		this.removeFromRunningJobs(jobId);
+		if (!callbacks) {
+			console.error('[warning] no job id callback for', jobId);
+			return true;
+		}
+		console.log('[info] collected render result over SOAP for job', jobId);
+		for (const item of callbacks)
+			item(parsed);
+		delete getUploadCallbacks()[jobId];
+		return true;
+	}
+
+	private pollJobRenderResult(port: number, jobId: string): { cancel: () => void } {
+		let cancelled = false;
+		let warned = false;
+		const startedAt = Date.now();
+		const tick = async () => {
+			if (cancelled)
+				return;
+			if (Date.now() - startedAt > 3 * 60 * 1000) {
+				console.log('[info] giving up on collecting render result for job', jobId);
+				return;
+			}
+			try {
+				const json = await this.readJobRenderResult(port, jobId);
+				if (json && this.deliverJobResult(jobId, json)) {
+					cancelled = true;
+					return;
+				}
+				if (!json && !warned) {
+					warned = true;
+					console.log('[info] no render result on the job yet, will keep checking', jobId);
+				}
+			} catch (e) {
+				if (!warned) {
+					warned = true;
+					console.log('[warn] could not read render result from RCC', jobId, (e as Error)?.message);
+				}
+			}
+			if (!cancelled)
+				setTimeout(tick, 3000);
+		};
+		setTimeout(tick, 3000);
+		return {
+			cancel: () => {
+				cancelled = true;
+			},
+		};
+	}
+
 	private createShutdownRequest(jobId: string): { request: string; jobId: string; } {
 		const xml = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -843,8 +982,15 @@ export default class CommandHandler extends StdExceptions {
 			data: job.request,
 			timeout: 2 * 60 * 1000,
 		});
+		// Collect the render over SOAP as well as waiting for the upload: builds whose TrustCheck
+		// refuses outbound HTTP leave the script blocked on its own post forever.
+		const poller = this.pollJobRenderResult(rcc.rccReference.port, job.jobId);
 		// wait until over
-		await awaitResult(job.jobId);
+		try {
+			await awaitResult(job.jobId);
+		} finally {
+			poller.cancel();
+		}
 	}
 	
 	private async requestRccThumbnailerClose(rcc: IGameEntry) {

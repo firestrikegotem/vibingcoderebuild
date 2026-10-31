@@ -149,14 +149,28 @@ local function render()
     local encoded = ThumbnailGenerator:Click('png', 420, 420, true, true)
     print("[debug] rendered clothing thumbnail, bytes:", tostring(#tostring(encoded)))
 
-    local postOk, data = pcall(function()
-        return HttpService:PostAsync(uploadURL, HttpService:JSONEncode({
+    local payload = HttpService:JSONEncode({
             ['thumbnail'] = encoded,
             ['assetId'] = assetId,
             ['accessKey'] = "AccessKey",
             ['type'] = "Image",
             ['jobId'] = jobId,
-        }), Enum.HttpContentType.TextPlain)
+        })
+ -- Park the finished image on the job as well. Some RCC builds refuse every
+ -- outbound HTTP request (TrustCheck), which leaves the render stuck forever.
+ -- The game server reads this value back over SOAP instead.
+ pcall(function()
+     _G.__bloxynThumbnail = payload
+     local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")
+     if holder == nil then
+         holder = Instance.new("StringValue")
+         holder.Name = "__BloxynThumbnail"
+         holder.Parent = game:GetService("ServerStorage")
+     end
+     holder.Value = payload
+ end)
+    local postOk, data = pcall(function()
+        return HttpService:PostAsync(uploadURL, payload, Enum.HttpContentType.TextPlain)
     end)
     print("[debug] post over", postOk, data)
 end

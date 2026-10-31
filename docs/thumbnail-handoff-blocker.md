@@ -3,6 +3,30 @@
 Avatar and clothing thumbnails render but never reach the server. Everything up
 to and including the render works; the last step does not.
 
+## Attempted fix: collect the render over SOAP
+
+HTTP from inside RCC is out of the picture, so the render no longer has to upload
+anything. Each render script now builds its JSON payload, parks it on the job
+(`_G.__bloxynThumbnail` plus a `__BloxynThumbnail` StringValue in ServerStorage)
+*before* attempting its post, and then posts as before. The game server polls
+`BatchJobEx` on the job every 3 seconds, reads the parked payload out of the
+SOAP response, and feeds it to the same callback the HTTP upload used to reach.
+The old upload path is still there, so an RCC build whose HTTP works keeps
+working.
+
+What to look for in the game server console after a redraw:
+
+- `[info] collected render result over SOAP for job <id>` - the payload came
+  back and the usual resize/compression ran on it. Thumbnails are fixed.
+- `[info] no render result on the job yet, will keep checking` followed by
+  nothing - this RCC build rejects `BatchJobEx` (or runs each script in a fresh
+  `_G`), which is where the next round of work starts.
+
+## Previous notes
+
+The sections below describe how the HTTP route was narrowed down before the
+SOAP collector was added.
+
 ## What works
 
 - RCCService (0.256.0.17523 from archive.roblonium.com) starts from the game
@@ -32,10 +56,9 @@ Progress made on the path there, in order:
 The website answers on port 80 over loopback (`curl http://127.0.0.1/` returns
 302 from the guard), so the listener is not the problem.
 
-## Next approach to try
+## Notes for whoever picks this up
 
-Skip HTTP from inside RCC. RCC's scripting host exposes the render job over
-SOAP; have the game server call the job with `BatchJobEx`/`OpenJobEx` so the
-script returns `ThumbnailGenerator:Click` output as the job result, and let the
-game server write the PNG itself. That removes the trust check, the port
-question and the hosts file from the pipeline entirely.
+The hosts file entries and the port-80 bindings are no longer needed by the
+render path, but leave them: the 2016 client and the website both use
+`bbblox.org` on port 80, and a leftover `::1 bbblox.org` line should be removed
+if it is present (it makes `bbblox.org` resolve to a dead IPv6 listener).
