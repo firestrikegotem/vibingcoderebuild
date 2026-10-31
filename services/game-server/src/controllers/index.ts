@@ -284,7 +284,11 @@ export default class CommandHandler extends StdExceptions {
 			const rccPath = path.resolve(conf.rcc || path.join(__dirname, '../../../RCCService'));
 			const rccExecutableName = os.platform() === 'win32' ? 'RCCService.exe' : 'rcc';
 			const rccExecutable = path.join(rccPath, rccExecutableName);
-			const rccArgs = ['-Console', '-PlaceId:1818', '-port', portToRunOn.toString(), '-Content', conf.content || path.join(rccPath, 'content')];
+			// Same invocation the upstream docker script uses: -Port is the SOAP port RCC answers
+			// job requests on. Passing -PlaceId instead makes RCC treat the number as its game
+			// network port, leaving no SOAP listener and every job with ECONNREFUSED. The place a
+			// job needs comes from the job script itself (local placeId = ...), not from here.
+			const rccArgs = ['-Console', '-Content', conf.content || path.join(rccPath, 'content'), '-Port', portToRunOn.toString()];
 			rccTarget = rccExecutable;
 			try {
 				rcc = cp.spawn(rccExecutable, rccArgs, {
