@@ -79,6 +79,7 @@ IConfiguration gameServerConfig = new ConfigurationBuilder()
     .Build();
 Roblox.Configuration.GameServerIpAddresses = gameServerConfig.GetSection("GameServers").Get<IEnumerable<GameServerConfigEntry>>();
 Roblox.Configuration.RccAuthorization = configuration.GetSection("RccAuthorization").Value;
+Roblox.Configuration.ThumbnailUploadUrl = configuration.GetSection("ThumbnailUploadUrl").Value ?? "";
 Roblox.Configuration.AssetValidationServiceUrl = configuration.GetSection("AssetValidation:BaseUrl").Value;
 Roblox.Configuration.AssetValidationServiceAuthorization = configuration.GetSection("AssetValidation:Authorization").Value;
 

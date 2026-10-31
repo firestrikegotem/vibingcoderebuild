@@ -24,17 +24,6 @@ const scripts: Record<string, string> = {
 // without it the scripts keep pointing at whatever domain was hardcoded in them.
 const renderBaseUrl = conf.baseUrl.replace('//localhost', '//127.0.0.1');
 
-// RCC only fetches from the host it was patched to trust, and that applies to the thumbnail
-// upload back to us as well. Post to the same host the render used, not a hardcoded loopback
-// address, so a hosts-file setup (bbblox.org -> 127.0.0.1) works end to end.
-const uploadHost = (() => {
-	try {
-		const host = new URL(renderBaseUrl).hostname;
-		return host === 'localhost' ? '127.0.0.1' : host;
-	} catch (e) {
-		return '127.0.0.1';
-	}
-})();
 
 for (const s in scripts) {
 	scripts[s] = scripts[s]
@@ -48,7 +37,19 @@ for (const s in scripts) {
 		.replace(/isDebugServer = false/g, env === 'development' ? 'isDebugServer = true' : 'isDebugServer = false')
 		// set upload url
 		// .replace(/UPLOAD_URL_HERE/g, (dockerEnabled ? 'http://host.docker.internal' : 'http://127.0.0.1:') + conf.port + '/api/upload-thumbnail-v1')
-		.replace(/UPLOAD_URL_HERE/g, 'http://' + uploadHost + ':' + conf.port + '/api/upload-thumbnail-v1')
+		// RCC only trusts URLs under its BaseUrl, so uploads go to the website, which forwards
+		// them to this game server. Posting to the game server's own port is rejected outright.
+		.replace(/UPLOAD_URL_HERE/g, (() => {
+			try {
+				const base = new URL(renderBaseUrl);
+				if (base.hostname === 'localhost' || base.hostname === '127.0.0.1') {
+					return 'http://127.0.0.1:' + conf.port + '/api/upload-thumbnail-v1';
+				}
+				return base.origin + '/api/upload-thumbnail-v1';
+			} catch (e) {
+				return 'http://127.0.0.1:' + conf.port + '/api/upload-thumbnail-v1';
+			}
+		})())
 		.replace(/AccessKey/g, conf.authorization.replace('"', '\\"'))
 		.replace(/local baseURL = "http:\/\/localhost";/g, `local baseURL = "${conf.baseUrl}";`)
 }

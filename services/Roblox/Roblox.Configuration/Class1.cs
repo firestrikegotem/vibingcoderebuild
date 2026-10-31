@@ -54,6 +54,10 @@ public static class Configuration
     // Set to false to let people sign up without Discord (emergency escape hatch).
     public static bool DiscordSignupGateEnabled { get; set; } = true;
     public static string RccAuthorization { get; set; }
+    // Where RCC's finished thumbnails are posted. RCC only talks to URLs under its configured
+    // BaseUrl, so on Windows this usually points at this website which forwards to the game
+    // server. Blank means "post straight to the game server on localhost".
+    public static string ThumbnailUploadUrl { get; set; } = "";
     public const string UserAgentBypassSecret = "503534DA-F2F8-4681-9B37-15EE9EAE88DC4D0FAE23-F672-4BC6-8D5F-E35A2939680DB1980985-AF9C-4B2E-B19E-67005FBAD27B";
     public static long PackageShirtAssetId { get; set; }
     public static long PackagePantsAssetId { get; set; }
