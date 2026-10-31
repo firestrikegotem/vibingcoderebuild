@@ -373,7 +373,12 @@ export default class CommandHandler extends StdExceptions {
 			port: portToRunOn,
 			close: () => {
 				try {
-					rcc.kill('SIGINT');
+					// SIGINT is not honoured by RCCService.exe: it kept running and held the SOAP
+					// port, so the next instance died with "Only one usage of each socket address".
+					if (os.platform() === 'win32' && rcc.pid)
+						cp.spawnSync('taskkill', ['/PID', String(rcc.pid), '/F']);
+					else
+						rcc.kill('SIGINT');
 					game.rccReference = null;
 				} catch (e) { }
 				if (dockerEnabled) {
@@ -901,6 +906,21 @@ export default class CommandHandler extends StdExceptions {
 		}
 	}
 
+	/** True when something already answers SOAP on the port, i.e. an RCC is already running. */
+	private async isRccListening(port: number): Promise<boolean> {
+		try {
+			await axiosClient.request({
+				method: 'GET',
+				url: 'http://127.0.0.1:' + port + '/',
+				validateStatus: () => true,
+				timeout: 1000,
+			});
+			return true;
+		} catch (e) {
+			return false;
+		}
+	}
+
 	private async GetRccForRender(): Promise<IGameEntry> {
 		let applicable = this.RenderRcc.filter(v => !v.rccClosed && v.rccReference).sort((a,b) => {
 			return a.runningGames > b.runningGames ? 1 : a.runningGames === b.runningGames ? (
@@ -920,6 +940,39 @@ export default class CommandHandler extends StdExceptions {
 					return rcc;
 				}
 			}
+		}
+		// An RCC from an earlier job can still be listening even though its entry was dropped.
+		// Starting a second one on the same port only produces "Only one usage of each socket
+		// address" and an immediate exit, so reuse whatever is already answering instead.
+		if (await this.isRccListening(rccPort)) {
+			console.log('[info] an RCC is already listening on', rccPort, '- reusing it instead of starting another');
+			const adoptedId = this.randomId();
+			const adopted = {
+				rccClosed: false,
+				rccReference: {
+					close: () => {},
+					port: rccPort,
+					id: this.randomId(),
+				},
+				createdAt: Date.now(),
+				runningGames: 0,
+				renderCount: 0,
+				maxPlayerCount: 0,
+				placeId: 0,
+				players: [],
+				serverId: adoptedId,
+				port: 0,
+				stdout: '',
+				stderr: '',
+				exitCode: '',
+				interval: {
+					onEnd: () => {},
+					latest: setInterval(() => {}, 30 * 1000),
+				},
+			} as any as IGameEntry;
+			this.RenderRcc = this.RenderRcc.filter(v => !v.rccClosed);
+			this.RenderRcc.push(adopted);
+			return adopted;
 		}
 		console.log('[info] no applicable RCC instances for render, will create one');
 		const id = this.randomId();
