@@ -111,6 +111,32 @@ const localizeScriptUrls = (script: string): string => {
 
 const maxRendersBeforeRestart = 100;
 
+/**
+ * RCCService.exe started with piped stdio exits immediately on Windows (exit code null, no
+ * output at all), while the very same command line runs fine from a console. Handing it real
+ * file handles instead of pipes keeps it alive and leaves a log we can read when a render fails.
+ */
+const rccLogPath = (port: number): string => path.join(__dirname, '../../rcc-' + port + '.log');
+
+const spawnStdioFor = (port: number): cp.StdioOptions => {
+	if (os.platform() !== 'win32') return 'pipe';
+	try {
+		const fd = fs.openSync(rccLogPath(port), 'a');
+		return ['ignore', fd, fd];
+	} catch (e) {
+		return 'pipe';
+	}
+};
+
+const readRccLogTail = (port: number, lines = 12): string => {
+	try {
+		const content = fs.readFileSync(rccLogPath(port)).toString();
+		return content.trim().split('\n').slice(-lines).join('\n');
+	} catch (e) {
+		return '';
+	}
+};
+
 interface IQueueEntry {
 	request: string;
 	jobId: string;
@@ -244,7 +270,7 @@ export default class CommandHandler extends StdExceptions {
 		}
 		this.reservedPorts.push(portToRunOn);
 		console.log('[info] found port for rcc!',portToRunOn);
-		let rcc: cp.ChildProcessWithoutNullStreams;
+		let rcc: cp.ChildProcess;
 		const dockerPidFileLocation = path.join(__dirname, '../../rcccid-' + portToRunOn);
 		let rccCid: string|undefined;
 		// Describes what was launched so a failure can tell the operator what to fix.
@@ -263,7 +289,7 @@ export default class CommandHandler extends StdExceptions {
 			try {
 				rcc = cp.spawn(rccExecutable, rccArgs, {
 					cwd: rccPath,
-					stdio: 'pipe',
+					stdio: spawnStdioFor(portToRunOn),
 				});
 			} catch (spawnError) {
 				const code = (spawnError as NodeJS.ErrnoException)?.code;
@@ -275,7 +301,7 @@ export default class CommandHandler extends StdExceptions {
 				const quoted = '"' + rccExecutable + '" ' + rccArgs.map(a => /\s/.test(a) ? '"' + a + '"' : a).join(' ');
 				rcc = cp.spawn('cmd.exe', ['/d', '/s', '/c', quoted], {
 					cwd: rccPath,
-					stdio: 'pipe',
+					stdio: spawnStdioFor(portToRunOn),
 					windowsVerbatimArguments: true,
 				});
 			}
@@ -302,22 +328,22 @@ export default class CommandHandler extends StdExceptions {
 		rcc.on('message', (msg) => {
 			console.log(msg);
 		});
-		rcc.stdout.on('data', function (data) {
+		rcc.stdout?.on('data', function (data) {
 			game.stdout += data.toString();
 			if (!game.stdout.endsWith('\n')) {
 				game.stdout += '\n';
 			}
 			console.log('stdout: ' + data.toString());
 		});
-		rcc.stderr.on('data', function (data) {
+		rcc.stderr?.on('data', function (data) {
 			game.stderr += data.toString();
 			if (!game.stderr.endsWith('\n')) {
 				game.stderr += '\n';
 			}
 			console.log('stderr: ' + data.toString());
 		});
-		rcc.stdout.resume();
-		rcc.stderr.resume();
+		rcc.stdout?.resume();
+		rcc.stderr?.resume();
 		rcc.on('exit', (code) => {
 			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
 			console.log('[info] rcc child process exited with code ', code);
@@ -417,7 +443,9 @@ export default class CommandHandler extends StdExceptions {
 		do {
 			let elapsedSeconds = (Date.now() - start) / 1000;
 			if (elapsedSeconds > 10) {
-				throw new Error('Waited over 10 seconds for rcc, give up');
+				const tail = readRccLogTail(port);
+				throw new Error('Waited over 10 seconds for RCC on port ' + port + ', give up' +
+					(tail ? '. RCC said:\n' + tail : '. It printed nothing at all, see ' + rccLogPath(port)));
 			}
 			if (game.rccClosed) {
 				throw new Error(game.rccFailureReason || 'RCC was closed');
