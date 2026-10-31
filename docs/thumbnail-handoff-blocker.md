@@ -27,6 +27,16 @@ What to look for in the game server console after a redraw:
 The sections below describe how the HTTP route was narrowed down before the
 SOAP collector was added.
 
+## Render websocket URL
+
+The website reaches the render service over a websocket, not HTTP: point
+`Render.BaseUrl` at the game server's `thumbnailWebsocketPort` (5002 in the
+checked-in `game-server/config.json`), e.g. `http://127.0.0.1:5002`. If it points
+at a plain HTTP host such as `http://bbblox.org`, the handshake is refused with
+"The server returned status code '200' when status code '101' was expected",
+`there are 0 bad servers` shows up, and every redraw silently goes nowhere - no
+request ever appears in the game server console.
+
 ## What works
 
 - RCCService (0.256.0.17523 from archive.roblonium.com) starts from the game
