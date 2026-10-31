@@ -47,14 +47,17 @@ namespace Roblox.Rendering
                     var socket = ws;
                     if (socket == null || socket.State != WebSocketState.Open)
                     {
-                        await Task.Delay(1000);
-                        continue;
+                        // Returning lets ConnectionManager notice the dead socket and reconnect.
+                        // Spinning here instead left the app sending commands into a closed socket
+                        // forever, so every render failed with "A task was canceled".
+                        Console.WriteLine("[info] Render websocket is not open, reconnecting...");
+                        return;
                     }
                     var result = await socket.ReceiveAsync(memory.Memory, CancellationToken.None);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
                         Console.WriteLine("[info] Render websocket closed. Re-opening...");
-                        continue;
+                        return;
                     }
 
                     var msg = Encoding.UTF8.GetString(memory.Memory.Span.Slice(0, result.Count));
@@ -169,6 +172,8 @@ namespace Roblox.Rendering
             mux.ReleaseMutex();
             // Send message
             var bits = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(cmd));
+            if (ws is not {State: WebSocketState.Open})
+                Console.WriteLine("[warning] render socket is not open, waiting before sending {0}", command);
             while (ws is not {State: WebSocketState.Open})
             {
                 //Writer.Info(LogGroup.GeneralRender, "Ws not available, retry in a second");
