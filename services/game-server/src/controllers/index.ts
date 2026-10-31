@@ -840,7 +840,15 @@ export default class CommandHandler extends StdExceptions {
 				}
 				this.JobQueue = this.JobQueue.filter(v => v.jobId !== item.jobId);
 				this.RunningJobIds.push(item.jobId);
-				let rcc = await this.GetRccForRender();
+				let rcc: IGameEntry;
+				try {
+					rcc = await this.GetRccForRender();
+				} catch (e) {
+					// One render that cannot get an RCC must not take the game server down with it.
+					console.error('[error] could not get an RCC for job', item.jobId, '-', (e as Error)?.message);
+					this.RunningJobIds = this.RunningJobIds.filter(v => v !== item.jobId);
+					continue;
+				}
 				let msSinceCreation = Date.now() - item.createdAt;
 				// because we are an async function, we should be able to guarantee that doesCallbackExist will only ever return false if 2 minutes has passed, not if the callback was never created in the first place.
 				if (!doesCallbackExist(item.jobId)) {
