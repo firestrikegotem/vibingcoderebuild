@@ -34,7 +34,11 @@ namespace Roblox.Libraries.Assets
 
         private static string GetTemplateOneParam(string templateName, string paramName, string paramValue)
         {
-            return AddTemplateParameter(GetTemplate(templateName), paramName, paramValue);
+            // The clothing templates point their texture at {baseUrl}, which has to be an address
+            // RCC will actually fetch: its 2016 TrustCheck rejects anything containing "localhost".
+            var xml = AddTemplateParameter(GetTemplate(templateName), "baseUrl",
+                Roblox.Configuration.RccSafeBaseUrl ?? "http://127.0.0.1:5000");
+            return AddTemplateParameter(xml, paramName, paramValue);
         }
         
         public static string GetTeeShirt(long contentId)

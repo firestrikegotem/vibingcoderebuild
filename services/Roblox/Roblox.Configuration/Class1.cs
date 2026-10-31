@@ -22,6 +22,12 @@ public static class Configuration
     public static string AdminBundleDirectory { get; set; }
     public static string EconomyChatBundleDirectory { get; set; }
     public static string BaseUrl { get; set; }
+    // RCC's 2016 build has a TrustCheck that refuses any URL containing "localhost", and a
+    // refused asset URL shows up as a grey mannequin with no clothing. Every URL that gets
+    // handed to RCC (asset XML, the clothing content inside it) goes through this instead of
+    // BaseUrl, so a local dev box configured with localhost still renders.
+    public static string RccSafeBaseUrl =>
+        string.IsNullOrEmpty(BaseUrl) ? BaseUrl : BaseUrl.Replace("//localhost", "//127.0.0.1");
     public static string HCaptchaPublicKey { get; set; }
     public static string HCaptchaPrivateKey { get; set; }
     // Empty by default: a machine without any RCC hosts configured (a dev box, CI, a Linux sandbox)

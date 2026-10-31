@@ -237,7 +237,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""ShirtGraphic"" referent=""RBX0"">
         <Properties>
-            <Content name=""Graphic""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""Graphic""><url>{Configuration.RccSafeBaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">T-Shirt</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -251,7 +251,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""Shirt"" referent=""RBX0"">
         <Properties>
-            <Content name=""ShirtTemplate""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""ShirtTemplate""><url>{Configuration.RccSafeBaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">Shirt</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -265,7 +265,7 @@ namespace Roblox.Website.Controllers
     <External>nil</External>
     <Item class=""Pants"" referent=""RBX0"">
         <Properties>
-            <Content name=""PantsTemplate""><url>{Configuration.BaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
+            <Content name=""PantsTemplate""><url>{Configuration.RccSafeBaseUrl}/asset/?id={latestVersion.contentId}</url></Content>
             <string name=""Name"">Pants</string>
             <bool name=""archivable"">true</bool>
         </Properties>
@@ -639,7 +639,7 @@ namespace Roblox.Website.Controllers
         {
             var assets = await services.avatar.GetWornAssets(userId);
             return
-                $"{Configuration.BaseUrl}/Asset/BodyColors.ashx?userId={userId};{string.Join(";", assets.Select(c => Configuration.BaseUrl + "/Asset/?id=" + c))}";
+                $"{Configuration.RccSafeBaseUrl}/Asset/BodyColors.ashx?userId={userId};{string.Join(";", assets.Select(c => Configuration.RccSafeBaseUrl + "/Asset/?id=" + c))}";
         }
 
         private void CheckServerAuth(string auth)
