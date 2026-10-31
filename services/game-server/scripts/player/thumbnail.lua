@@ -158,13 +158,25 @@ end
         -- local humanoid = Player.Character.Humanoid
         -- humanoid:BuildRigFromAttachments()
         print("[debug] render avatar")
-        local hasCam = game.Workspace:GetChildren()[1];
-        if hasCam ~= nil then
-            if hasCam:FindFirstChild("ThumbnailCamera") ~= nil then
-                print("has thumbnail camera")
-            else
-                print("Does not have thumbnail camera")
+        -- The full body click needs its own scriptable camera. Checking for one and carrying on
+        -- regardless (the old behaviour) leaves the place with no camera, and RCC's
+        -- ThumbnailGenerator:Click then takes the whole RCC process down with it.
+        local character = Player.Character
+        local head = character and character:FindFirstChild("Head")
+        if head ~= nil then
+            local camera = workspace.CurrentCamera
+            if camera == nil then
+                camera = Instance.new("Camera")
+                camera.Parent = character
             end
+            camera.Name = "ThumbnailCamera"
+            camera.CameraType = Enum.CameraType.Scriptable
+            camera.CoordinateFrame = CFrame.new((head.CFrame * CFrame.new(0, 1.2, 11)).p, head.Position)
+            camera.FieldOfView = 30
+            workspace.CurrentCamera = camera
+            print("[debug] thumbnail camera ready")
+        else
+            print("[warn] no head on the character, rendering with whatever camera the place has")
         end
         local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, false)
         print("[debug] avatar render over. delete character")
