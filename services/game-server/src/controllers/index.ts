@@ -157,6 +157,32 @@ const logRccCrashContext = (port: number): void => {
 	}
 };
 
+/**
+ * Print the live tail of an RCC's log file. On Windows the child writes straight to a file
+ * instead of a pipe, so this is the only view of what a running job is doing - and the only
+ * way to tell "the script errored on line 3" from "the script is still clicking".
+ */
+const logRccTail = (port: number, label: string, lines = 30): void => {
+	try {
+		const logPath = rccLogPath(port);
+		if (!fs.existsSync(logPath)) return;
+		const noisy = (line: string): boolean => {
+			const t = line.trim();
+			return t === ''
+				|| t.startsWith('rl>http')
+				|| t.startsWith('httpGet  failed')
+				|| t.startsWith('.  Elapsed time')
+				|| t.includes('Trust check failed');
+		};
+		const tail = fs.readFileSync(logPath, 'utf8').split(/\r?\n/).filter(l => !noisy(l)).slice(-lines);
+		if (tail.length === 0) return;
+		console.log('[rcc:' + label + '] tail of', path.basename(logPath) + ':');
+		for (const line of tail) console.log('[rcc:' + label + ']   ' + line.trim());
+	} catch (e) {
+		// diagnostics must never break a render
+	}
+};
+
 const spawnStdioFor = (port: number): cp.StdioOptions => {
 	if (os.platform() !== 'win32') return 'pipe';
 	try {
@@ -1087,12 +1113,16 @@ export default class CommandHandler extends StdExceptions {
 			},
 			data: job.request,
 			timeout: 2 * 60 * 1000,
-		}).then(() => {
-			console.log('[info] rcc replied to job', job.jobId);
+		}).then((resp) => {
+			// The reply is either the job's script result or a SOAP fault explaining the failure.
+			const body = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+			console.log('[info] rcc replied to job', job.jobId, '-', body.replace(/\s+/g, ' ').slice(0, 400));
+			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		}).catch((e) => {
 			// Expected whenever the process dies instead of replying; the upload decides the
 			// outcome, so this is only logged.
 			console.log('[info] rcc did not reply to job', job.jobId, '-', e?.message ?? String(e));
+			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		});
 		try {
 			await awaitResult(job.jobId);
