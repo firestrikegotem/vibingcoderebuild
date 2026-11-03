@@ -11,6 +11,9 @@ const scripts: Record<string, string> = {
 	gameServer: fs.readFileSync(path.join(__dirname, '../scripts/gameserver.lua')).toString(),
 	// Thumbs
 	playerThumbnail: fs.readFileSync(path.join(__dirname, '../scripts/player/thumbnail.lua')).toString(),
+	// RCC assembles the character from the website's CharacterFetch URL instead of the job
+	// inserting assets one by one - see the comment at the top of the file.
+	playerAvatarFetch: fs.readFileSync(path.join(__dirname, '../scripts/player/avatarFetch.lua')).toString(),
 	playerHeadshot: fs.readFileSync(path.join(__dirname, '../scripts/player/headshot.lua')).toString(),
 	imageTexture: fs.readFileSync(path.join(__dirname, '../scripts/asset/image.lua')).toString(),
 	assetThumbnail: fs.readFileSync(path.join(__dirname, '../scripts/asset/asset.lua')).toString(),

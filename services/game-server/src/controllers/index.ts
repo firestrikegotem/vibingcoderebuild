@@ -1327,11 +1327,9 @@ export default class CommandHandler extends StdExceptions {
 	public async GenerateThumbnail(user: models.AvatarRenderRequest): Promise<string> {
 		console.log(`[info] thumbnail requested`, user);
 		const jobRequest = this.createSoapRequest(
-			scripts.playerThumbnail
+			scripts.playerAvatarFetch
 				// set user id
 				.replace(/65789275746246/g, user.userId.toString())
-				// set user avatar json
-				.replace(/JSON_AVATAR/g, JSON.stringify(user).replace(`'`, `\\'`))
 				.replace(/_X_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
 				.replace(/_Y_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
 		, uuid.v4());
