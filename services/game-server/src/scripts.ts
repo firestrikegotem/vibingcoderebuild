@@ -15,6 +15,9 @@ const scripts: Record<string, string> = {
 	// inserting assets one by one - see the comment at the top of the file.
 	playerAvatarFetch: fs.readFileSync(path.join(__dirname, '../scripts/player/avatarFetch.lua')).toString(),
 	playerHeadshot: fs.readFileSync(path.join(__dirname, '../scripts/player/headshot.lua')).toString(),
+	// Same renderer as the headshot job, framed for the whole body and returning the PNG
+	// as the job result instead of uploading it.
+	playerThumbnailBatch: fs.readFileSync(path.join(__dirname, '../scripts/player/thumbnailBatch.lua')).toString(),
 	imageTexture: fs.readFileSync(path.join(__dirname, '../scripts/asset/image.lua')).toString(),
 	assetThumbnail: fs.readFileSync(path.join(__dirname, '../scripts/asset/asset.lua')).toString(),
 	meshThumbnail: fs.readFileSync(path.join(__dirname, '../scripts/asset/mesh.lua')).toString(),
