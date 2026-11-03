@@ -639,6 +639,30 @@ public class AssetsService : ServiceBase, IService
     /// torso: the renderer was asked to load the clothing through RCC, could not, and the fallback
     /// rendered an avatar - which is a grey mannequin when the texture never arrives.
     /// </summary>
+    /// <summary>
+    /// Whether the picture this garment is drawn with can actually be read. Clothing uploaded by older
+    /// tools on this site can point at a texture id whose file is long gone.
+    /// </summary>
+    private async Task<bool> HasClothingTexture(Dto.Assets.AssetVersionEntry latestVersion)
+    {
+        if (latestVersion.contentId == 0)
+            return false;
+
+        try
+        {
+            var textureVersion = await GetLatestAssetVersion(latestVersion.contentId);
+            if (string.IsNullOrWhiteSpace(textureVersion.contentUrl))
+                return false;
+            using var content = await GetAssetContent(textureVersion.contentUrl!);
+            return content.Length > 0;
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetRender, "could not read the texture for clothing asset {0}: {1}", latestVersion.assetId, e.Message);
+            return false;
+        }
+    }
+
     private async Task<bool> TryUseClothingTexture(long assetId, Dto.Assets.AssetVersionEntry latestVersion)
     {
         if (latestVersion.contentId == 0)
@@ -673,6 +697,14 @@ public class AssetsService : ServiceBase, IService
     private async Task CreateClothingThumbnailV2(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
+
+        // An item whose texture never made it onto the disk cannot be drawn at all. Skip it instead of
+        // spending a render on it every pass, which is what keeps the repair loop busy forever.
+        if (!await HasClothingTexture(latestVersion))
+        {
+            Writer.Info(LogGroup.AssetRender, "clothing asset {0} (type {1}) has no texture on disk, leaving it without a thumbnail", assetId, (int)assetType);
+            return;
+        }
 
         // A catalog thumbnail is a dummy wearing the item, so that is what to try first. It needs a
         // working renderer, and the renderer is the unreliable part of this stack, so a failure falls

@@ -21,10 +21,9 @@ public class ThumbnailsControllerV1 : ControllerBase
 {
     public static void StartThumbnailFixLoop()
     {
-        // this thing is annoying in debug
-#if DEBUG
-        return;
-#else
+        // This runs in debug builds too. It used to return immediately, which quietly meant that
+        // anything without a picture - every clothing upload included - stayed a placeholder forever
+        // on a dev machine, no matter how long you waited.
         _ = Task.Run(async () =>
         {
             while (true)
@@ -41,15 +40,15 @@ public class ThumbnailsControllerV1 : ControllerBase
                 await Task.Delay(TimeSpan.FromMinutes(5));
             }
         });
-#endif
     }
     
     private static async Task ThumbnailFixTask()
     {
-        // Release only awaits the lock, so make the no-op explicit for debug builds.
-        await Task.CompletedTask;
         // Debug envs always have one site running, so we don't need a lock
-#if !DEBUG
+#if DEBUG
+        await FixAssetThumbnails();
+        await FixUserThumbnails();
+#else
         await using var distributedThumbFixLock =
             await Roblox.Services.Cache.redLock.CreateLockAsync("FixThumbnailsV1", TimeSpan.FromMinutes(10));
         if (!distributedThumbFixLock.IsAcquired)
