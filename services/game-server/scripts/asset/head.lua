@@ -85,7 +85,7 @@ print("passed inserts")
 
         wait(1)
         print("load now")
-        local encoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, true)
+        local encoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true)
         print("[debug] send post request containing test asset")
 
         local ok, data = pcall(function()

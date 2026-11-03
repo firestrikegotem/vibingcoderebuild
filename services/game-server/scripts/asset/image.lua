@@ -145,8 +145,8 @@ local function render()
     workspace.CurrentCamera = camera
 
     -- First click warms up mesh/texture loading (known RCC quirk), the second is the real render.
-    ThumbnailGenerator:Click('png', 1, 1, true, false)
-    local encoded = ThumbnailGenerator:Click('png', 420, 420, true, true)
+    ThumbnailGenerator:Click('png', 1, 1, true)
+    local encoded = ThumbnailGenerator:Click('png', 420, 420, true)
     print("[debug] rendered clothing thumbnail, bytes:", tostring(#tostring(encoded)))
 
     local payload = HttpService:JSONEncode({

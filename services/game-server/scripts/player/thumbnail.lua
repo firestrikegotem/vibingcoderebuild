@@ -185,7 +185,7 @@ end
         else
             print("[warn] no head on the character, rendering with whatever camera the place has")
         end
-        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, true)
+        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true)
         print("[debug] avatar render over. delete character")
         Player.Character:Destroy()
         print("[debug] [player/thumbnail] send post request containing avatar")

@@ -64,8 +64,8 @@ local function render()
     workspace.CurrentCamera = camera
     
     -- 4. Click the picture
-    ThumbnailGenerator:Click('png', 1, 1, true, false) -- Render once to fix mesh loading bug
-    local encoded = ThumbnailGenerator:Click('png', 420, 420, true, true)
+    ThumbnailGenerator:Click('png', 1, 1, true) -- Render once to fix mesh loading bug
+    local encoded = ThumbnailGenerator:Click('png', 420, 420, true)
     
     local payload = HttpService:JSONEncode({
             ['type'] = 'Asset',

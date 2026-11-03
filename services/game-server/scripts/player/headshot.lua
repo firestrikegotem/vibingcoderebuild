@@ -222,7 +222,7 @@ end
 
 	workspace.CurrentCamera = camera
     
-        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true, true)
+        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true)
         print("[debug] [player/headshot] send post request containing avatar")
         local payload = HttpService:JSONEncode({
                 ['thumbnail'] = avatarEncoded,

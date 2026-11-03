@@ -32,7 +32,7 @@ local assetId = assetId[1];
     local function render()
         didRun = true
         print("[debug] render game thumbnail")
-        local encoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, false, true)
+        local encoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, false)
         print("[debug] send post request containing game")
 
         local ok, data = pcall(function()
