@@ -475,7 +475,8 @@ public class AssetsService : ServiceBase, IService
     private async Task CreateAssetTextureThumbnail(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
-        var response = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int) assetType, cancellationToken);
+        // Nothing to draw clothing-wise here: images and faces are their own texture, so no texture id.
+        var response = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int) assetType, 0, cancellationToken);
         var key = await UploadAssetContent(response, Configuration.ThumbnailsDirectory, "png");
         await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, key, ModerationStatus.ReviewApproved);
     }
