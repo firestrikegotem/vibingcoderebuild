@@ -11,7 +11,9 @@
 
 param(
     [int]$Port = 53640,
-    [int]$GraphicsMode = 3
+    [int]$GraphicsMode = 3,
+    [int]$Width = 420,
+    [int]$Height = 420
 )
 
 $jobId = [guid]::NewGuid().ToString()
@@ -25,6 +27,7 @@ local function rec(k, v) out[#out+1] = k .. '=' .. tostring(v) end
 local tg = game:GetService('ThumbnailGenerator')
 tg.GraphicsMode = $GraphicsMode
 rec('mode', tg.GraphicsMode)
+rec('size', '$Width' .. 'x' .. '$Height')
 
 local block = Instance.new('Part', workspace)
 block.Anchored = true
@@ -35,24 +38,20 @@ cam.CameraType = Enum.CameraType.Scriptable
 cam.CoordinateFrame = CFrame.new(Vector3.new(0, 10, 20), Vector3.new(0, 5, 0))
 workspace.CurrentCamera = cam
 
-local function attempt(fn)
-    local ok, res = pcall(fn)
-    if ok then
-        if type(res) == 'string' then
-            return 'ok|len=' .. #res .. '|head=' .. string.sub(res, 1, 8)
-        end
-        return 'ok|type=' .. type(res) .. '|val=' .. tostring(res)
+-- Mirrors the real pipeline: warm up at 1x1, then retry until a real base64 PNG comes back.
+pcall(function() return tg:Click('png', 1, 1, true) end)
+local got = nil
+for i = 1, 3 do
+    local ok, res = pcall(function() return tg:Click('png', $Width, $Height, true) end)
+    if ok and type(res) == 'string' then
+        rec('try' .. i, 'len=' .. #res .. '|head=' .. string.sub(res, 1, 8))
+        if string.sub(res, 1, 5) == 'iVBOR' then got = res break end
+    else
+        rec('try' .. i, 'ok=' .. tostring(ok) .. '|' .. tostring(res))
     end
-    return 'err|' .. tostring(res)
+    wait(0.5)
 end
-
--- 'invalid string position' came from inside Click, so this build is rejecting the
--- argument list before it ever renders. Sweep the plausible signatures in one job.
-rec('a5', attempt(function() return tg:Click('png', 420, 420, true, true) end))
-rec('a4', attempt(function() return tg:Click('png', 420, 420, true) end))
-rec('a3', attempt(function() return tg:Click('png', 420, 420) end))
-rec('a2', attempt(function() return tg:Click('png', 420) end))
-
+rec('result', got and 'png' or 'none')
 return table.concat(out, '|')
 "@
 
