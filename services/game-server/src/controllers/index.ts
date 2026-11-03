@@ -445,9 +445,16 @@ export default class CommandHandler extends StdExceptions {
 		rcc.on('exit', (code) => {
 			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
 			console.log('[info] rcc child process exited with code ', code);
-			// Anything still waiting on this process is never going to get an image from it.
+			// Anything still waiting on this process is never going to get an image from it - but
+			// the render is usually already sitting in the log by the time the process dies, and
+			// the tail can arrive a moment after the exit event. Declaring failure instantly sent
+			// jobs to the drawn fallback seconds before their real image turned up.
 			for (const jobId of ((game as any).__activeJobs ?? [])) {
-				failJob(jobId, 'RCC exited with code ' + code + ' before delivering the render');
+				setTimeout(() => {
+					if (doesCallbackExist(jobId)) {
+						failJob(jobId, 'RCC exited with code ' + code + ' before delivering the render');
+					}
+				}, 2500);
 			}
 			(game as any).__activeJobs = [];
 			if (code !== 0 && code !== null) {
@@ -738,7 +745,8 @@ export default class CommandHandler extends StdExceptions {
 		const callbacks = getUploadCallbacks()[jobId];
 		this.removeFromRunningJobs(jobId);
 		if (!callbacks) {
-			console.error('[warning] no job id callback for', jobId);
+			// Normal when a job already fell back: the log tail can finish after the caller gave up.
+			console.log('[info] render for job', jobId, 'arrived after the job was already settled');
 			return true;
 		}
 		console.log('[info] delivered the render for job', jobId);
