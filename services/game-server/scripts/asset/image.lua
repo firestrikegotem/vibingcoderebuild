@@ -12,6 +12,9 @@
 local jobId = "InsertJobIdHere";
 local assetId = 65789275746246;
 local assetType = 358843;
+-- The image the clothing is drawn with. When the game server knows it, the dummy is dressed from
+-- that picture directly instead of loading the clothing item and unpacking its XML mid-render.
+local textureId = 73111111111119;
 -- RCC's TrustCheck refuses to load anything from "localhost", so always use the raw loopback IP.
 local baseURL = "http://bbblox.org";
 local uploadURL = "UPLOAD_URL_HERE";
@@ -131,28 +134,59 @@ local function buildClothingFromUrl(dummy)
     return nil
 end
 
+-- Puts the clothing on the dummy using the picture it is made of.
+local function dressFromTexture(dummy)
+    local url = baseURL .. "/asset/?id=" .. tostring(textureId)
+    local item = nil
+
+    if assetType == 11 then
+        item = Instance.new("Shirt")
+        item.ShirtTemplate = url
+    elseif assetType == 12 then
+        item = Instance.new("Pants")
+        item.PantsTemplate = url
+    elseif assetType == 2 then
+        item = Instance.new("ShirtGraphic")
+        item.Graphic = url
+    end
+
+    if item ~= nil then
+        item.Parent = dummy
+        print("[debug] dressed dummy in", item.ClassName, "from texture", textureId)
+    end
+
+    return item
+end
+
 local function render()
     local dummy, torso = buildDummy()
 
-    print("[debug] loading clothing asset", assetId, "type", assetType)
-
-    local loaded = nil
-    local ok, result = pcall(function()
-        return InsertService:LoadAsset(assetId)
-    end)
-    if ok then
-        loaded = result
-    else
-        print("[warning] InsertService:LoadAsset failed:", result)
+    local clothing = nil
+    if textureId ~= 0 then
+        clothing = dressFromTexture(dummy)
     end
 
-    local clothing = findClothing(loaded)
-    if clothing then
-        clothing.Parent = dummy
-        print("[debug] equipped", clothing.ClassName, "from loaded asset")
-    else
-        print("[warning] no clothing instance in loaded asset, falling back to asset URL")
-        clothing = buildClothingFromUrl(dummy)
+    if clothing == nil then
+        print("[debug] loading clothing asset", assetId, "type", assetType)
+
+        local loaded = nil
+        local ok, result = pcall(function()
+            return InsertService:LoadAsset(assetId)
+        end)
+        if ok then
+            loaded = result
+        else
+            print("[warning] InsertService:LoadAsset failed:", result)
+        end
+
+        clothing = findClothing(loaded)
+        if clothing then
+            clothing.Parent = dummy
+            print("[debug] equipped", clothing.ClassName, "from loaded asset")
+        else
+            print("[warning] no clothing instance in loaded asset, falling back to asset URL")
+            clothing = buildClothingFromUrl(dummy)
+        end
     end
 
     -- Give the client time to download the clothing texture from the website.

@@ -672,6 +672,28 @@ public class AssetsService : ServiceBase, IService
     private async Task CreateClothingThumbnailV2(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
+
+        // A catalog thumbnail is a dummy wearing the item, so that is what to try first. It needs a
+        // working renderer, and the renderer is the unreliable part of this stack, so a failure falls
+        // through to the texture copy rather than leaving the item blank in the shop.
+        if (latestVersion.contentId != 0)
+        {
+            try
+            {
+                using var renderTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken ?? CancellationToken.None);
+                renderTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+                var rendered = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int)assetType,
+                    latestVersion.contentId, renderTimeout.Token);
+                var renderedKey = await UploadAssetContent(rendered, Configuration.ThumbnailsDirectory, "png");
+                await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, renderedKey, ModerationStatus.AwaitingApproval);
+                return;
+            }
+            catch (Exception e)
+            {
+                Writer.Info(LogGroup.AssetRender, "no dummy render for clothing asset {0} (type {1}), using its texture instead: {2}", assetId, (int)assetType, e.Message);
+            }
+        }
+
         try
         {
             if (await TryUseClothingTexture(assetId, latestVersion))
@@ -681,18 +703,8 @@ public class AssetsService : ServiceBase, IService
         {
             Writer.Info(LogGroup.AssetRender, "could not use the clothing texture for asset {0}: {1}", assetId, e.Message);
         }
-        try
-        {
-            var response = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int)assetType, cancellationToken);
-            var key = await UploadAssetContent(response, Configuration.ThumbnailsDirectory, "png");
-            await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, key, ModerationStatus.AwaitingApproval);
-            return;
-        }
-        catch (Exception e)
-        {
-            Writer.Info(LogGroup.AssetRender, "clothing render failed for asset {0} (type {1}), falling back to avatar render: {2}", assetId, (int)assetType, e.Message);
-        }
 
+        // Nothing left but asking for the item on an avatar, which at least puts something there.
         await CreateClothingThumbnail(assetId, assetType, cancellationToken);
     }
 

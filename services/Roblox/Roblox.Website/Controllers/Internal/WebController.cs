@@ -466,6 +466,9 @@ public class WebController : ControllerBase
                     {
                         var xml = await System.IO.File.ReadAllTextAsync(templatePath);
                         xml = xml.Replace("{assetId}", imageAsset.assetId.ToString());
+                        // The templates write their texture url as {baseUrl}/asset/?id={assetId}, and
+                        // leaving {baseUrl} in place made the saved file point nowhere.
+                        xml = xml.Replace("{baseUrl}", Roblox.Configuration.RccSafeBaseUrl);
                         // RCC's TrustCheck rejects "localhost", so the texture URL must use the loopback IP.
                         xml = xml.Replace("//localhost", "//127.0.0.1");
 

@@ -250,12 +250,13 @@ namespace Roblox.Rendering
             return await SendCmdWithErrHandlingAsync("GenerateThumbnailHeadshot", new List<dynamic> {data}, cancellationToken);
         }
 
-        public static async Task<Stream> RequestTextureThumbnail(long assetId, int assetTypeId, CancellationToken? cancellationToken = null)
+        public static async Task<Stream> RequestTextureThumbnail(long assetId, int assetTypeId, long textureId = 0, CancellationToken? cancellationToken = null)
         {
             return await SendCmdWithErrHandlingAsync("GenerateThumbnailTexture", new List<dynamic>
             {
                 assetId, 
-                assetTypeId
+                assetTypeId,
+                textureId,
             }, cancellationToken);
         }
         

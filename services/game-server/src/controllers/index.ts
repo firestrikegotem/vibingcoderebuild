@@ -1422,11 +1422,14 @@ export default class CommandHandler extends StdExceptions {
 	 * @param assetId 
 	 * @returns 
 	 */
-	public async GenerateThumbnailTexture(assetId: number, assetTypeId: number): Promise<string> {
+	public async GenerateThumbnailTexture(assetId: number, assetTypeId: number, textureId?: number): Promise<string> {
+		// textureId is the image the clothing is drawn with. Handing it over means the render script
+		// dresses the dummy directly instead of loading the clothing item and unpacking its XML.
 		const jobRequest = this.createSoapRequest(
 			scripts.imageTexture
 				.replace(/65789275746246/g, assetId.toString())
 				.replace(/358843/g, assetTypeId.toString())
+				.replace(/73111111111119/g, (textureId ?? 0).toString())
 		, uuid.v4())
 		this.addToQueue(jobRequest);
 		return (await getResult(jobRequest.jobId, 1)).thumbnail;

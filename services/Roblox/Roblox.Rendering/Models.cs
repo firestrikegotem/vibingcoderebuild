@@ -33,6 +33,13 @@ namespace Roblox.Rendering
     {
         public long id { get; set; }
         public AvatarAssetTypeEntry assetType { get; set; } = null!;
+        /// <summary>
+        /// For clothing (Shirt 11, Pants 12, T-Shirt 2): the image asset holding the picture itself.
+        /// The renderer applies clothing straight from this, so it never has to fetch and unpack the
+        /// clothing item, which is the step that used to fail and leave the avatar without its clothes.
+        /// Zero for everything else.
+        /// </summary>
+        public long textureId { get; set; }
     }
     
     public class AvatarData

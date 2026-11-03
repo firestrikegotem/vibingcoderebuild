@@ -572,7 +572,27 @@ public class AvatarService : ServiceBase, IService
         // seconds a render takes, and a failed render left it blank for good. The old image stays
         // up until the new one is actually on disk.
         // Create request
-        var extendedAssetDetails = await assets.MultiGetInfoById(assetIds);
+        var extendedAssetDetails = (await assets.MultiGetInfoById(assetIds)).ToList();
+        // Clothing is handed to the renderer as the picture it is drawn with. Fetching the clothing
+        // item itself made the renderer unpack an XML for every shirt and pair of trousers it had to
+        // put on, and this RCC build does not survive that - the avatar came back in its body colours
+        // with nothing on. The texture id removes that step entirely.
+        var clothingTextures = new Dictionary<long, long>();
+        foreach (var item in extendedAssetDetails)
+        {
+            if (item.assetType is not (Type.Shirt or Type.Pants or Type.TeeShirt)) continue;
+            try
+            {
+                var version = await assets.GetLatestAssetVersion(item.id);
+                if (version.contentId != 0) clothingTextures[item.id] = version.contentId;
+            }
+            catch (Exception e)
+            {
+                Roblox.Logging.Writer.Info(Roblox.Logging.LogGroup.GeneralRender,
+                    "Could not find the texture for clothing asset {0}: {1}", item.id, e.Message);
+            }
+        }
+
         var request = new Roblox.Rendering.AvatarData()
         {
             userId = userId,
@@ -583,6 +603,7 @@ public class AvatarService : ServiceBase, IService
                 {
                     id = (int) c.assetType,
                 },
+                textureId = clothingTextures.TryGetValue(c.id, out var textureId) ? textureId : 0,
             }),
             bodyColors = new AvatarBodyColors()
             {

@@ -105,8 +105,37 @@ end
         local av = HttpService:JSONDecode('JSON_AVATAR')
         -- Player.Character['Right Leg']:Destroy()
         local done = 0
+        -- Shirt 11, Pants 12, T-Shirt 2. These are put on from their picture: loading the clothing
+        -- item itself makes this build unpack an XML in the middle of a render, which it does not
+        -- survive - the avatar came back in body colours with nothing on. The avatar data carries
+        -- the texture id, so the renderer can dress the character directly.
+        local CLOTHING_CLASS = { [2] = "ShirtGraphic", [11] = "Shirt", [12] = "Pants" }
+        local function dressIn(class, textureId)
+            local item = Instance.new(class)
+            local url = baseURL .. "/asset/?id=" .. tostring(textureId)
+            if class == "Shirt" then
+                item.ShirtTemplate = url
+            elseif class == "Pants" then
+                item.PantsTemplate = url
+            else
+                item.Graphic = url
+            end
+            item.Parent = Player.Character
+        end
+
         for _, asset in pairs(av.assets) do
             print('[debug] add',asset.name,'to char')
+            local clothingClass = CLOTHING_CLASS[asset.assetType.id]
+            if clothingClass ~= nil then
+                local textureId = asset.textureId or 0
+                if textureId ~= 0 then
+                    local dressed = pcall(function() dressIn(clothingClass, textureId) end)
+                    print('[debug] dressed in', clothingClass, 'texture', textureId, 'ok', tostring(dressed))
+                else
+                    print('[warn] no texture id for', clothingClass, 'asset', asset.id)
+                end
+                done = done + 1
+            else
             coroutine.wrap(function()
                 local ok, Asset = pcall(function()
                     return Insert:LoadAsset(asset.id)
@@ -143,6 +172,7 @@ end
 
                 done = done + 1;
             end)()
+            end
         end
         repeat wait() until done == #av.assets
         local bc = av.bodyColors;
