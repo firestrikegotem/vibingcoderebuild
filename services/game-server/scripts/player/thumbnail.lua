@@ -19,6 +19,27 @@ game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false);
 local _thumbGen = game:GetService('ThumbnailGenerator');
 _thumbGen.GraphicsMode = 3;
 print('[debug] graphics mode', _thumbGen.GraphicsMode);
+
+-- ThumbnailGenerator:Click does not throw on failure in this RCC build: it returns the
+-- error text as the value ("invalid string position"), and the first click after RCC
+-- starts is the one that fails. Upstream's own scripts click once at 1x1 for this reason.
+-- Warm the renderer up, then retry until the result is a real base64 PNG.
+local function clickPng(width, height)
+    pcall(function() return ThumbnailGenerator:Click('png', 1, 1, true) end)
+    for attempt = 1, 4 do
+        local ok, result = pcall(function()
+            return ThumbnailGenerator:Click('png', width, height, true)
+        end)
+        if ok and type(result) == 'string' and string.sub(result, 1, 5) == 'iVBOR' then
+            print('[debug] render ok on attempt', attempt, 'bytes', string.len(result))
+            return result
+        end
+        print('[debug] render attempt', attempt, 'returned', ok, tostring(result))
+        wait(0.5)
+    end
+    return nil
+end
+
 HttpService.HttpEnabled = true;
 ScriptContext.ScriptsDisabled = true
 Lighting.Outlines = false
@@ -185,7 +206,11 @@ end
         else
             print("[warn] no head on the character, rendering with whatever camera the place has")
         end
-        local avatarEncoded = ThumbnailGenerator:Click('png', _X_RES_, _Y_RES_, true)
+        local avatarEncoded = clickPng(_X_RES_, _Y_RES_)
+        if avatarEncoded == nil then
+            print('[warn] full body render failed, nothing to upload')
+            return
+        end
         print("[debug] avatar render over. delete character")
         Player.Character:Destroy()
         print("[debug] [player/thumbnail] send post request containing avatar")
