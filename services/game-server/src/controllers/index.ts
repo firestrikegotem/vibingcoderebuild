@@ -9,6 +9,7 @@ const sleep = util.promisify(setTimeout);
 import os = require('os');
 import conf from '../helpers/Config';
 import { renderFallbackThumbnail, renderFallbackHeadshot } from '../avatarFallback';
+import { RenderLogPayload } from '../renderLogPayload';
 import * as models from '../models';
 import sharp = require('sharp');
 import uuid = require('uuid');
@@ -785,6 +786,58 @@ export default class CommandHandler extends StdExceptions {
 		};
 	}
 
+	/**
+	 * Collects a render the job printed to RCC's log as `[payload] <jobId> <index> <chunk>` lines.
+	 * Each chunk carries its own index, so interleaved output from RCC's other threads cannot
+	 * corrupt the image.
+	 */
+	private watchLogForPayload(port: number, jobId: string): { cancel: () => void } {
+		const logPath = rccLogPath(port);
+		const collector = new RenderLogPayload(jobId);
+		let offset = 0;
+
+		const deliver = (image: string) => {
+			if (collector.done) return;
+			console.log('[info] collected', image.length, 'bytes of render from the RCC log for job', jobId);
+			this.deliverJobResult(jobId, JSON.stringify({
+				thumbnail: image,
+				userId: 0,
+				accessKey: 'AccessKey',
+				type: 'PlayerHeadshot',
+				jobId,
+			}));
+		};
+
+		const timer = setInterval(() => {
+			if (collector.done) {
+				clearInterval(timer);
+				return;
+			}
+			try {
+				if (!fs.existsSync(logPath)) return;
+				const size = fs.statSync(logPath).size;
+				// RCC truncates the file on some starts; go back to the top if it shrank.
+				if (size < offset) offset = 0;
+				if (size <= offset) return;
+				const length = size - offset;
+				const buffer = Buffer.alloc(length);
+				const fd = fs.openSync(logPath, 'r');
+				try {
+					fs.readSync(fd, buffer, 0, length, offset);
+				} finally {
+					fs.closeSync(fd);
+				}
+				offset = size;
+				const image = collector.feed(buffer.toString('utf8'));
+				if (image) deliver(image);
+			} catch (e) { /* the next tick reads again */ }
+		}, 200);
+
+		return {
+			cancel: () => clearInterval(timer),
+		};
+	}
+
 	private createShutdownRequest(jobId: string): { request: string; jobId: string; } {
 		const xml = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -1188,22 +1241,10 @@ export default class CommandHandler extends StdExceptions {
 			console.log('[info] rcc did not reply to job', job.jobId, '-', e?.message ?? String(e));
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		});
-		// A render that cannot post drops its payload in the shared folder instead. Watch it as
-		// fast as the file system notices: this RCC dies a second or two after the render, so a
-		// three second poll would arrive after the body is already cold.
-		const droppedFile = path.join(fileDropDir, job.jobId + '.json');
-		try { fs.unlinkSync(droppedFile); } catch (e) { /* not there yet */ }
-		const fileWatch = setInterval(() => {
-			try {
-				if (!fs.existsSync(droppedFile)) return;
-				const payload = fs.readFileSync(droppedFile, 'utf8');
-				fs.unlinkSync(droppedFile);
-				if (payload && payload.indexOf('"thumbnail"') !== -1) {
-					console.log('[info] render dropped a file for job', job.jobId);
-					this.deliverJobResult(job.jobId, payload);
-				}
-			} catch (e) { /* the next tick will try again */ }
-		}, 200);
+		// The only channel out of the sandbox. RCC scripts have no io and no writefile, and
+		// PostAsync kills the process, but print() reaches this log file - so the script emits
+		// the image as numbered base64 chunks and this picks them up as they land.
+		const logWatch = this.watchLogForPayload(rcc.rccReference.port, job.jobId);
 		// OpenJobEx answers as soon as the job is accepted, so its reply is not the render. While
 		// the script is alive the image can be read back off the job over SOAP, which is the
 		// route that works when this build's outbound HTTP swallows the upload. Race the two:
@@ -1219,7 +1260,7 @@ export default class CommandHandler extends StdExceptions {
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 			throw e;
 		} finally {
-			clearInterval(fileWatch);
+			logWatch.cancel();
 			poller.cancel();
 			rccAny.__activeJobs = (rccAny.__activeJobs ?? []).filter((v: string) => v !== job.jobId);
 			void request;

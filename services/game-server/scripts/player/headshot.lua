@@ -262,23 +262,23 @@ end
             .. ',"type":"PlayerHeadshot"'
             .. ',"jobId":"' .. tostring(jobId) .. '"}'
         print("[stage] payload built, bytes", string.len(payload))
-        -- What can this sandbox actually reach? Answers one question with one line: if io exists
-        -- the image can go straight onto disk, which sidesteps both the crashing HTTP call and
-        -- the SOAP read-back.
-        print("[probe] io", type(io), "os", type(os), "writefile", type(writefile), "plugin", type(plugin))
-        local outPath = "OUT_DIR/" .. tostring(jobId) .. ".json"
-        if type(io) == "table" and io.open then
-            local wrote, err = pcall(function()
-                local f = io.open(outPath, "wb")
-                if f == nil then return false end
-                f:write(payload)
-                f:close()
-                return true
-            end)
-            print("[stage] file drop attempted:", wrote, err, outPath)
-        else
-            print("[stage] no io in this sandbox, cannot drop a file")
+        -- What this sandbox can reach: io is nil and writefile is nil, so a script cannot touch
+        -- the disk, and HttpService:PostAsync below is what kills the process. print() works
+        -- though, and RCC sends it to the log file the game server already tails. So the image
+        -- leaves the job as text: base64 in numbered chunks under a job id, which can be put
+        -- back together even when other RCC threads interleave their own output.
+        local tag = tostring(jobId)
+        local chunkSize = 900
+        local imageLength = string.len(avatarEncoded)
+        local totalChunks = math.ceil(imageLength / chunkSize)
+        print("[payload] begin " .. tag .. " " .. tostring(totalChunks) .. " " .. tostring(imageLength))
+        for i = 1, totalChunks do
+            print("[payload] " .. tag .. " " .. tostring(i) .. " "
+                .. string.sub(avatarEncoded, (i - 1) * chunkSize + 1, i * chunkSize))
         end
+        print("[payload] end " .. tag)
+        -- Give the log writer a moment to flush the chunks before anything risky runs.
+        wait(0.25)
         -- Send it straight away. The old crash landed on HttpService:JSONEncode above, never on
         -- this call, so the request was never actually attempted - which is why no upload ever
         -- reached the game server. Two argument form on purpose: the optional content type enum
