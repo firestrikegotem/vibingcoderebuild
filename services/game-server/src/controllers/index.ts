@@ -159,7 +159,9 @@ const logRccCrashContext = (port: number): void => {
 const spawnStdioFor = (port: number): cp.StdioOptions => {
 	if (os.platform() !== 'win32') return 'pipe';
 	try {
-		const fd = fs.openSync(rccLogPath(port), 'a');
+		// Truncate: appending across every restart mixed several RCC runs into one file, so a
+		// crash tail showed another process's lines and read as nonsense.
+		const fd = fs.openSync(rccLogPath(port), 'w');
 		return ['ignore', fd, fd];
 	} catch (e) {
 		return 'pipe';
