@@ -30,8 +30,9 @@ function logBuildFingerprint(): void {
 	const headshot = loaded.playerHeadshot ?? '';
 	const markers = [
 		'full-body camera: ' + (thumbnail.includes('look at the body') ? 'yes' : 'NO'),
-		'flush wait: ' + (thumbnail.includes('Hold the job open') ? 'yes' : 'NO'),
-		'headshot flush wait: ' + (headshot.includes('Hold the job open') ? 'yes' : 'NO'),
+		'job held open: ' + (thumbnail.includes('for _ = 1, 120 do wait(0.5)') ? 'yes' : 'NO'),
+		'headshot held open: ' + (headshot.includes('for _ = 1, 120 do wait(0.5)') ? 'yes' : 'NO'),
+		'http post: ' + (/local TRY_HTTP_POST = true/.test(thumbnail) ? 'on' : 'off (reading back over SOAP)'),
 	];
 	console.log('[info] render scripts loaded - thumbnail', thumbnail.length, 'bytes, headshot', headshot.length, 'bytes');
 	console.log('[info] ' + markers.join(' | '));

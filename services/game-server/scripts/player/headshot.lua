@@ -269,13 +269,21 @@ end
             end
             holder.Value = payload
         end)
-        local ok, data = pcall(function()
-            return HttpService:PostAsync(uploadURL, payload, Enum.HttpContentType.TextPlain)
-        end)
-        print("[debug] post over", ok, data)
-        -- The job ending is what kills this RCC process, and an unfinished request dies with
-        -- it. Hold the job open long enough for the game server to collect the upload; it
-        -- recycles the RCC as soon as the image is in.
+        -- PostAsync is what kills this RCC. The log is unambiguous: the click succeeds, the
+        -- script prints "send post request", and the next thing is StartProcessException with
+        -- no "post over" line - so the process dies inside the request, and no pcall can catch
+        -- that. The image is already parked above, so the post is switched off while the game
+        -- server reads it back over SOAP. Flip this on once an RCC whose content matches the
+        -- binary is in place.
+        local TRY_HTTP_POST = false
+        if TRY_HTTP_POST then
+            local ok, data = pcall(function()
+                return HttpService:PostAsync(uploadURL, payload)
+            end)
+            print("[debug] post over", ok, data)
+        end
+        -- Keep the job alive so the image can be read off it: the poll runs every 3 seconds
+        -- and the game server recycles this RCC as soon as it has the payload.
         for _ = 1, 120 do wait(0.5) end
     end
 

@@ -258,12 +258,12 @@ interface IGameEntry {
 interface IExecutorStatus {
 	games: IGameEntry[];
 }
-const maxJobQueueRunningCount = (() => {
-	if (!dockerEnabled)
-		return Math.max(1, Math.trunc(os.cpus().length/2));
-	return Math.max(1, Math.trunc(os.cpus().length/2));
-})();
-console.log('[info] system thread count',maxJobQueueRunningCount);
+// One render at a time. ThumbnailGenerator is a single shared renderer inside RCC, so two
+// scripts clicking it at once (which is what half the cores gives you) fight over the same
+// camera and graphics context. Serving three renders in parallel only ever produced a crash
+// partway through one of them.
+const maxJobQueueRunningCount = 1;
+console.log('[info] render concurrency', maxJobQueueRunningCount, '(one job per RCC)');
 
 const truncateForDiscordMessage = (msg: string) => {
 	msg = msg.replace(/\*/g, '\\*').replace(/\_/g, '\\_').replace(/\~/g, '\\~').replace(/\`/g, '\\`');
