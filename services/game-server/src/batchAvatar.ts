@@ -168,6 +168,27 @@ export function legacyScript(appearanceUrl: string, baseUrl: string, width: numb
 -- Software GL: the process dies on the click with the other backends on this machine.
 thumbnailGenerator.GraphicsMode = 3
 print('[debug] graphics mode', thumbnailGenerator.GraphicsMode)
+
+-- The official script never makes a camera, and clicking with no CurrentCamera is what
+-- kills the process on the very first click. The headshot job builds one and renders fine,
+-- so build the same thing here, framed out far enough to hold the whole R6 body.
+local character = player.Character
+local head = character and character:FindFirstChild("Head")
+if head then
+    local camera = workspace.CurrentCamera
+    if camera == nil then
+        camera = Instance.new("Camera")
+        camera.Parent = character
+    end
+    camera.Name = "ThumbnailCamera"
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CoordinateFrame = CFrame.new((head.CFrame * CFrame.new(0, 1.2, 11)).p, head.Position)
+    camera.FieldOfView = 30
+    workspace.CurrentCamera = camera
+    print('[debug] avatar camera ready, fov', camera.FieldOfView)
+else
+    print('[warn] the loaded character has no head, cannot frame a camera')
+end
 local function __bloxynClick()
     -- This binary fails the first click after RCC starts and returns error text instead of
     -- throwing, so warm it up and check that the result really is PNG data.
