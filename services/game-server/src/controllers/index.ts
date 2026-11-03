@@ -9,6 +9,7 @@ const sleep = util.promisify(setTimeout);
 import os = require('os');
 import conf from '../helpers/Config';
 import { renderFallbackThumbnail, renderFallbackHeadshot } from '../avatarFallback';
+import { renderAvatarOnRcc } from '../batchAvatar';
 import * as models from '../models';
 import sharp = require('sharp');
 import uuid = require('uuid');
@@ -1326,19 +1327,21 @@ export default class CommandHandler extends StdExceptions {
 	 */
 	public async GenerateThumbnail(user: models.AvatarRenderRequest): Promise<string> {
 		console.log(`[info] thumbnail requested`, user);
-		const jobRequest = this.createSoapRequest(
-			scripts.playerAvatarFetch
-				// set user id
-				.replace(/65789275746246/g, user.userId.toString())
-				.replace(/_X_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
-				.replace(/_Y_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
-		, uuid.v4());
-		// create the job
-		this.addToQueue(jobRequest);
-		// await job
+		const size = Math.trunc(420 * resolutionMultiplier.userThumbnail);
 		try {
-			const result = await getResult(jobRequest.jobId, resolutionMultiplier.userThumbnail);
-			return result.thumbnail;
+			// One BatchJob call returns the finished PNG. That is the whole render: no open
+			// job to poll, no upload route, and no wrapper place around the avatar script.
+			const entry = await this.GetRccForRender();
+			const port = entry.rccReference ? (entry.rccReference.port || rccPort) : rccPort;
+			entry.renderCount = (entry.renderCount ?? 0) + 1;
+			const image = await renderAvatarOnRcc(port, {
+				userId: user.userId,
+				width: size,
+				height: size,
+				rig: user.playerAvatarType ?? 'R6',
+			});
+			if (image) return image;
+			throw new Error('RCC returned no image for this avatar');
 		} catch (e) {
 			return await this.fallbackAvatar(user, 'thumbnail', e);
 		}
