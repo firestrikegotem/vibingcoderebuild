@@ -93,18 +93,25 @@ const axiosClient = axiosStatic.create({
 });
 
 /**
- * The 2016 RCC build has a TrustCheck that refuses to fetch any URL containing "localhost",
- * which makes every texture/asset download fail ("Temp read failed") and leaves clothing
- * thumbnails as a grey mannequin. Every script we send to RCC therefore has its backend
- * URLs rewritten to the raw loopback IP.
+ * The 2016 RCC build refuses to fetch any URL containing "localhost", and it prefixes bare
+ * hosts with "www.", so every script we send has its backend URLs rewritten to config.json's
+ * baseUrl. That value must carry the website's port: without one RCC fetches
+ * http://<host>/asset/... on port 80, finds no listener, and the job dies with
+ * StartProcessException while loading the avatar's clothing.
  */
-const rccSafeBaseUrl = 'http://127.0.0.1:5000';
+const rccSafeBaseUrl = (): string => conf.baseUrl;
+
+if (conf.baseUrl && !/:\d+(\/|$)/.test(conf.baseUrl)) {
+	console.warn('[warn] config.json baseUrl "' + conf.baseUrl + '" has no port. RCC will fetch assets on port 80 and fail - set it to http://bbblox.org:5000');
+}
 
 const localizeScriptUrls = (script: string): string => {
+	const base = rccSafeBaseUrl();
 	return script
-		.replace(/https?:\/\/www\.economy-simulator\.org/g, rccSafeBaseUrl)
-		.replace(/https?:\/\/economy-simulator\.org/g, rccSafeBaseUrl)
-		.replace(/https?:\/\/localhost:5000/g, rccSafeBaseUrl)
+		.replace(/https?:\/\/(www\.)?economy-simulator\.org/g, base)
+		.replace(/https?:\/\/(www\.)?bbblox\.org/g, base)
+		.replace(/https?:\/\/(www\.)?bloxyn\.net/g, base)
+		.replace(/https?:\/\/localhost:5000/g, base)
 		// any leftover bare "localhost" (no explicit port), e.g. http://localhost/asset/
 		.replace(/https?:\/\/localhost(?![.\w])/g, 'http://127.0.0.1');
 };
