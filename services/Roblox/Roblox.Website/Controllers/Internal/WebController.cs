@@ -485,6 +485,19 @@ public class WebController : ControllerBase
                 await services.assets.SetItemPrice(asset.assetId, 0, null);
                 await services.assets.UpdateAssetMarketInfo(asset.assetId, true, false, false, null, null);
 
+                // Give the item its catalog picture now. Without this the shop shows an hourglass
+                // until the five-minute repair loop gets to it, which looks like a broken upload
+                // even when everything worked. A thumbnail problem must never fail the upload
+                // itself, so it is caught and logged.
+                try
+                {
+                    await services.assets.RenderAssetAsync(asset.assetId, request.assetType);
+                }
+                catch (Exception thumbnailError)
+                {
+                    Console.WriteLine($"[warning] could not draw a thumbnail for asset {asset.assetId}: {thumbnailError.Message}");
+                }
+
                 return asset;
             }
             else if (isImage)
