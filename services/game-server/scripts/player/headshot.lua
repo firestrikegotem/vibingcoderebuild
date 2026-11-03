@@ -273,6 +273,9 @@ end
             return HttpService:PostAsync(uploadURL, payload, Enum.HttpContentType.TextPlain)
         end)
         print("[debug] post over", ok, data)
+        -- The job ending is what kills this RCC process, and an unfinished request dies with
+        -- it. Hold the job open briefly so the upload has time to leave the process.
+        for _ = 1, 8 do wait(0.5) end
     end
 
     local ok, data = pcall(function()

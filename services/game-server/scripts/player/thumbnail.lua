@@ -1,52 +1,8 @@
 local jobId = "InsertJobIdHere";
 local userId = 65789275746246;
-local mode = "R6";
+local mode = 'R6'
 local baseURL = "http://economy-simulator.org";
 local uploadURL = "UPLOAD_URL_HERE";
-local ScriptContext = game:GetService("ScriptContext");
-local Lighting = game:GetService('Lighting');
-local RunService = game:GetService('RunService');
-local ContentProvider = game:GetService('ContentProvider');
-local HttpService = game:GetService("HttpService");
-local ThumbnailGenerator = game:GetService('ThumbnailGenerator');
-local Players = game:GetService("Players");
-game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false);
--- 2 asks RCC for a graphics backend this build does not have, and the click crashes the
--- process. 4 is what the headshot script uses (and Roblox treats it as "let RCC decide").
--- 3 is the software OpenGL backend; OSMESA32.dll ships with this RCC build.
--- 4 means "no graphics context", and ThumbnailGenerator:Click then dies with
--- StartProcessException right after "thumbnail camera ready".
-local _thumbGen = game:GetService('ThumbnailGenerator');
-_thumbGen.GraphicsMode = 3;
-print('[debug] graphics mode', _thumbGen.GraphicsMode);
-
--- ThumbnailGenerator:Click does not throw on failure in this RCC build: it returns the
--- error text as the value ("invalid string position"), and the first click after RCC
--- starts is the one that fails. Upstream's own scripts click once at 1x1 for this reason.
--- Warm the renderer up, then retry until the result is a real base64 PNG.
-local function clickPng(width, height)
-    pcall(function() return ThumbnailGenerator:Click('png', 1, 1, true) end)
-    for attempt = 1, 4 do
-        local ok, result = pcall(function()
-            return ThumbnailGenerator:Click('png', width, height, true)
-        end)
-        if ok and type(result) == 'string' and string.sub(result, 1, 5) == 'iVBOR' then
-            print('[debug] render ok on attempt', attempt, 'bytes', string.len(result))
-            return result
-        end
-        print('[debug] render attempt', attempt, 'returned', ok, tostring(result))
-        wait(0.5)
-    end
-    return nil
-end
-
-HttpService.HttpEnabled = true;
-ScriptContext.ScriptsDisabled = true
-Lighting.Outlines = false
-ContentProvider:SetBaseUrl('http://economy-simulator.org')
-game:GetService("InsertService"):SetAssetUrl(baseURL .. "/asset/?id=%d")
-game:GetService("InsertService"):SetAssetVersionUrl(baseURL .. "/Asset/?assetversionid=%d")
-local Insert = game:GetService("InsertService")
 
 local function applyMesh(Player, children, limb)
     local ok, msg = pcall(function() 
@@ -82,28 +38,67 @@ local function applyPackage(Player, children)
     end
 end
 
+local function FindFirstChildWhichIsA(inst, className)
+    for _, asset in pairs(inst:GetChildren()) do
+        if asset.ClassName == className then
+            return asset
+        end
+    end
+    return nil
+end
+
+    local HttpService = game:GetService('HttpService')
+    local ScriptContext = game:GetService('ScriptContext')
+    local Lighting = game:GetService('Lighting')
+    local Players = game:GetService('Players')
+    local RunService = game:GetService('RunService')
+    local ContentProvider = game:GetService('ContentProvider')
+    local ThumbnailGenerator = game:GetService('ThumbnailGenerator')
+    game:GetService('StarterGui'):SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+    -- 3 is the software OpenGL backend (OSMesa32.dll ships with the RCC build).
+    ThumbnailGenerator.GraphicsMode = 3;
+    print('[debug] graphics mode', ThumbnailGenerator.GraphicsMode);
+
+-- ThumbnailGenerator:Click does not throw on failure in this RCC build: it returns the
+-- error text as the value ("invalid string position"), and the first click after RCC
+-- starts is the one that fails. Upstream's own scripts click once at 1x1 for this reason.
+-- Warm the renderer up, then retry until the result is a real base64 PNG.
+local function clickPng(width, height)
+    pcall(function() return ThumbnailGenerator:Click('png', 1, 1, true) end)
+    for attempt = 1, 4 do
+        local ok, result = pcall(function()
+            return ThumbnailGenerator:Click('png', width, height, true)
+        end)
+        if ok and type(result) == 'string' and string.sub(result, 1, 5) == 'iVBOR' then
+            print('[debug] render ok on attempt', attempt, 'bytes', string.len(result))
+            return result
+        end
+        print('[debug] render attempt', attempt, 'returned', ok, tostring(result))
+        wait(0.5)
+    end
+    return nil
+end
+
+
+    HttpService.HttpEnabled = true
+    ScriptContext.ScriptsDisabled = true
+    Lighting.Outlines = false
+    ContentProvider:SetBaseUrl('http://economy-simulator.org')
+    game:GetService("ContentProvider"):SetAssetUrl(baseURL .. "/Asset/")
+    game:GetService("InsertService"):SetAssetUrl(baseURL .. "/Asset/?id=%d")
+    pcall(function() game:GetService("ScriptInformationProvider"):SetAssetUrl(url .. "/Asset/") end)
+    game:GetService("ContentProvider"):SetBaseUrl(baseURL .. "/")
+    game:GetService("Players"):SetChatFilterUrl(baseURL .. "/Game/ChatFilter.ashx")
+    local Insert = game:GetService("InsertService")
+    game:GetService("InsertService"):SetAssetUrl(baseURL .. "/Asset/?id=%d")
+	game:GetService("InsertService"):SetAssetVersionUrl(baseURL .. "/Asset/?assetversionid=%d")
+
     local function render(id)
         -- game.StarterPlayer.GameSettingsAvatarType = Enum.GameAvatarType.R15
         local Player = Players:CreateLocalPlayer(id)
-        -- Player.CharacterAppearance = "http://localhost/Asset/AvatarAccoutrements.ashx?userId=1127502";
         Player:LoadCharacter()
-
-        local av = HttpService:JSONDecode('JSON_AVATAR')
-
-        --[[
-        if av.playerAvatarType == 'R15' then
-            local Character = Insert:LoadAsset(1664543044).Player
-            Character.Parent = game.Workspace
-            print('char len', #Character:GetChildren())
-            local Humanoid = Character.Humanoid
-            Player.Character = Character
-            local hrp = Player.Character.HumanoidRootPart
-            hrp.Anchored = true
-        end
-        ]]--
-
-
         -- this returns data in an identical format to https://avatar.roblox.com/v1/users/1/avatar
+        local av = HttpService:JSONDecode('JSON_AVATAR')
         -- Player.Character['Right Leg']:Destroy()
         local done = 0
         for _, asset in pairs(av.assets) do
@@ -114,11 +109,10 @@ end
                 end)
                 if ok == false then
                     done = done + 1;
-                    print("[debug] asset load fail for",asset.id,Asset)
                     return
                 end
                 local children = Asset:GetChildren()
-
+                
                 if asset.assetType.id == 17 then
                     applyMesh(Player, children, "Head")
                 end
@@ -126,7 +120,7 @@ end
                     applyPackage(Player, children)
                 else
                     for _, item in pairs(children) do
-                        print('[debug] add ',asset.Name, '/', item.Name,'to char (type =',asset.assetType.id,')')
+                        print('[debug] add ',asset.Name, '/', item.Name,'to char')
                         if asset.assetType.id == 31 then
                             print('[debug] Got right leg cl is',item.ClassName)
                         end
@@ -147,7 +141,6 @@ end
             end)()
         end
         repeat wait() until done == #av.assets
-        print("[debug] set body colors")
         local bc = av.bodyColors;
         local colors = {
             ['Head']      = bc.headColorId,
@@ -161,18 +154,15 @@ end
         for part, color in pairs(colors) do
             if Player.Character:FindFirstChild(part) then
                 Player.Character[part].BrickColor = BrickColor.new(color)
-            else
-                print("[warning] could not find",part,"in player")
             end
         end
 
         for _, object in pairs(Player.Character:GetChildren()) do
             if object:IsA('Tool') then
-                print("Player has gear, raise the right arm out.")
-                Player.Character.Torso['Right Shoulder'].CurrentAngle = math.rad(90)
+                object:Destroy()
+                -- Player.Character.Torso['Right Shoulder'].CurrentAngle = math.pi / 2
             end
         end
-
         --[[
         local guy = Player.Character
         guy.Head.Mesh:remove()
@@ -185,41 +175,86 @@ end
         
         -- local humanoid = Player.Character.Humanoid
         -- humanoid:BuildRigFromAttachments()
+        
+        print('use cam')
+        -- cam:Destroy()
+        -- cam = Instance.new("Camera", game.Workspace)
+        -- cam.CameraType = Enum.CameraType.Watch
+        -- cam.CameraSubject = Player.Character.Head
         print("[debug] render avatar")
-        -- The full body click needs its own scriptable camera. Checking for one and carrying on
-        -- regardless (the old behaviour) leaves the place with no camera, and RCC's
-        -- ThumbnailGenerator:Click then takes the whole RCC process down with it.
-        local character = Player.Character
-        local head = character and character:FindFirstChild("Head")
-        if head ~= nil then
-            local camera = workspace.CurrentCamera
-            if camera == nil then
-                camera = Instance.new("Camera")
-                camera.Parent = character
-            end
-            camera.Name = "ThumbnailCamera"
-            camera.CameraType = Enum.CameraType.Scriptable
-            camera.CoordinateFrame = CFrame.new((head.CFrame * CFrame.new(0, 1.2, 11)).p, head.Position)
-            camera.FieldOfView = 30
-            workspace.CurrentCamera = camera
-            print("[debug] thumbnail camera ready")
-        else
-            print("[warn] no head on the character, rendering with whatever camera the place has")
-        end
+        -- Player.Character.HumanoidRootPart.Anchored = true
+        -- local c = game.Workspace.CurrentCamera
+
+        local player = Player
+        local FFlagNewHeadshotLighting = false
+        local FFlagOnlyCheckHeadAccessoryInHeadShot = false
+        local cameraOffsetX = 0
+        local cameraOffsetY = 0
+        local maxHatZoom = 100
+        local baseHatZoom = 30
+
+
+        local maxDimension = 0
+
+        local quadratic = true
+
+
+    -- Remove gear
+	for _, child in pairs(player.Character:GetChildren()) do
+		if child:IsA("Tool") then
+			child:Destroy()
+		elseif child:IsA("Accoutrement") then
+            local handle = child:FindFirstChild("Handle")
+			if handle then
+				local attachment = FindFirstChildWhichIsA(handle, "Attachment")
+                
+                --legacy hat does not have attachment in it and should be considered when zoom out camera
+				if not FFlagOnlyCheckHeadAccessoryInHeadShot or not attachment or headAttachments[attachment.Name] then
+					local size = handle.Size / 2 + handle.Position - player.Character.Head.Position
+					local xy = Vector2.new(size.x, size.y)
+					if xy.magnitude > maxDimension then
+						maxDimension = xy.magnitude
+					end
+				end
+			end
+		end
+	end
+
+	-- Setup Camera
+	local maxHatOffset = 0.5 -- Maximum amount to move camera upward to accomodate large hats
+    maxDimension = math.min(1, maxDimension / 3) -- Confine maxdimension to specific bounds
+
+    if quadratic then
+        maxDimension = maxDimension * maxDimension -- Zoom out on quadratic interpolation
+    end
+
+    local viewOffset     = player.Character.Torso.CFrame * CFrame.new(cameraOffsetX, cameraOffsetY + maxHatOffset * maxDimension, 0.1) -- look at the body
+
+    local yAngle = -math.pi / 16
+	
+	local positionOffset = player.Character.Head.CFrame + (CFrame.Angles(0, yAngle, 0).lookVector.unit * 13) -- far enough back for the whole R6 body
+
+    local camera = Instance.new("Camera", player.Character)-- Instance.new("Camera", player.Character)
+    camera.Name = "ThumbnailCamera"
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CoordinateFrame = CFrame.new(positionOffset.p, viewOffset.p)
+    camera.FieldOfView = baseHatZoom + (maxHatZoom - baseHatZoom) * maxDimension
+    print("cam fov",camera.FieldOfView)
+
+	workspace.CurrentCamera = camera
+    
         local avatarEncoded = clickPng(_X_RES_, _Y_RES_)
         if avatarEncoded == nil then
-            print('[warn] full body render failed, nothing to upload')
+            print('[warn] thumbnail render failed, nothing to upload')
             return
         end
-        print("[debug] avatar render over. delete character")
-        Player.Character:Destroy()
         print("[debug] [player/thumbnail] send post request containing avatar")
         local payload = HttpService:JSONEncode({
-            ['thumbnail'] = avatarEncoded,
-            ['userId'] = userId,
-            ['accessKey'] = "AccessKey",
-            ['type'] = "PlayerThumbnail",
-            ['jobId'] = jobId,
+                ['thumbnail'] = avatarEncoded,
+                ['userId'] = userId,
+                ['accessKey'] = "AccessKey",
+                ['type'] = "PlayerHeadshot",
+                ['jobId'] = jobId,
         })
         -- Park the finished image on the job as well. Some RCC builds refuse every
         -- outbound HTTP request (TrustCheck), which leaves the render stuck forever at
@@ -237,13 +272,14 @@ end
         local ok, data = pcall(function()
             return HttpService:PostAsync(uploadURL, payload, Enum.HttpContentType.TextPlain)
         end)
-        print("[debug] post over",ok,data)
+        print("[debug] post over", ok, data)
+        -- The job ending is what kills this RCC process, and an unfinished request dies with
+        -- it. Hold the job open briefly so the upload has time to leave the process.
+        for _ = 1, 8 do wait(0.5) end
     end
 
-coroutine.wrap(function()
     local ok, data = pcall(function()
-        render(1)
+        render(userId)
     end)
     print("[player/thumbnail]", ok, data);
-    print("[debug] exit game");
-end)()
+

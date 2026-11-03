@@ -9,7 +9,6 @@ const sleep = util.promisify(setTimeout);
 import os = require('os');
 import conf from '../helpers/Config';
 import { renderFallbackThumbnail, renderFallbackHeadshot } from '../avatarFallback';
-import { postBatchJob } from '../batchAvatar';
 import * as models from '../models';
 import sharp = require('sharp');
 import uuid = require('uuid');
@@ -1327,22 +1326,19 @@ export default class CommandHandler extends StdExceptions {
 	 */
 	public async GenerateThumbnail(user: models.AvatarRenderRequest): Promise<string> {
 		console.log(`[info] thumbnail requested`, user);
-		const size = Math.trunc(420 * resolutionMultiplier.userThumbnail);
-		try {
-			// The headshot job is the only script on this machine that gets past the click, so
-			// the full-body shot is the same script with a wider camera. BatchJobEx hands the
-			// PNG back in the reply, which removes both the upload route and the read-back poll.
-			const entry = await this.GetRccForRender();
-			const port = entry.rccReference ? (entry.rccReference.port || rccPort) : rccPort;
-			entry.renderCount = (entry.renderCount ?? 0) + 1;
-			const script = scripts.playerThumbnailBatch
+		// Same job, queue and delivery as the headshot, which is the only script on this
+		// machine that gets past the click. Only the camera framing differs.
+		const jobRequest = this.createSoapRequest(
+			scripts.playerThumbnail
 				.replace(/65789275746246/g, user.userId.toString())
 				.replace(/JSON_AVATAR/g, JSON.stringify(user).replace(`'`, `\\'`))
-				.replace(/_X_RES_/g, size.toString())
-				.replace(/_Y_RES_/g, size.toString());
-			const { value, reply } = await postBatchJob(port, script, 120, ['BatchJobEx', 'BatchJob']);
-			if (value && value.startsWith('iVBOR')) return value;
-			throw new Error('RCC returned no image: ' + (value ?? reply).slice(0, 300));
+				.replace(/_X_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
+				.replace(/_Y_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
+		, uuid.v4());
+		this.addToQueue(jobRequest);
+		try {
+			const result = await getResult(jobRequest.jobId, resolutionMultiplier.userThumbnail);
+			return result.thumbnail;
 		} catch (e) {
 			return await this.fallbackAvatar(user, 'thumbnail', e);
 		}
