@@ -129,6 +129,33 @@ const maxRendersBeforeRestart = 100;
  */
 const rccLogPath = (port: number): string => path.join(__dirname, '../../rcc-' + port + '.log');
 
+/**
+ * When RCC exits non-zero it dies before answering SOAP, so the job's own prints are lost.
+ * They survive in the log file the child writes to, minus the crash-reporter noise, so print
+ * the tail here: the game server console is what we actually get to see.
+ */
+const logRccCrashContext = (port: number): void => {
+	try {
+		const logPath = rccLogPath(port);
+		if (!fs.existsSync(logPath)) return;
+		const noisy = (line: string): boolean => {
+			const t = line.trim();
+			return t === ''
+				|| t.startsWith('rl>http')
+				|| t.startsWith('httpGet  failed')
+				|| t.startsWith('.  Elapsed time')
+				|| t.includes('Trust check failed');
+		};
+		const lines = fs.readFileSync(logPath, 'utf8').split(/\r?\n/).filter(l => !noisy(l));
+		const tail = lines.slice(-25);
+		if (tail.length === 0) return;
+		console.log('[crash] last useful RCC output before it exited:');
+		for (const line of tail) console.log('[crash]   ' + line.trim());
+	} catch (e) {
+		// diagnostics must never break a render
+	}
+};
+
 const spawnStdioFor = (port: number): cp.StdioOptions => {
 	if (os.platform() !== 'win32') return 'pipe';
 	try {
@@ -363,6 +390,7 @@ export default class CommandHandler extends StdExceptions {
 			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
 			console.log('[info] rcc child process exited with code ', code);
 			if (code !== 0 && code !== null) {
+				logRccCrashContext(portToRunOn);
 				const lastedMilliseconds = ((Date.now() - game.createdAt) / 1000).toFixed(2);
 				const msg = `**RCC exited with code ${code}**\nSTDOUT=${truncateForDiscordMessage(game.stdout)}\nSTDERR=${truncateForDiscordMessage(game.stderr)}\nplaceId=${game.placeId}\nserverId=${game.serverId}\ndurationSeconds=${lastedMilliseconds}\nip=${myIp}`;
 			}
