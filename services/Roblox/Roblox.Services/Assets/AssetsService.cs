@@ -616,10 +616,51 @@ public class AssetsService : ServiceBase, IService
     private async Task CreateTeeShirtThumbnail(long assetId, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
+        try
+        {
+            if (await TryUseClothingTexture(assetId, latestVersion))
+                return;
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetRender, "could not use the tee shirt texture for asset {0}: {1}", assetId, e.Message);
+        }
         var thumbnailToUse = await Rendering.CommandHandler.RequestAssetTeeShirt(assetId, latestVersion.contentId, cancellationToken);
         var key = await UploadAssetContent(thumbnailToUse, Configuration.ThumbnailsDirectory, "png");
         await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, key,
             ModerationStatus.AwaitingApproval);
+    }
+
+    /// <summary>
+    /// A Shirt, Pants or T-Shirt *is* a picture: the upload flow stores the template as its own
+    /// image asset and points content_id at it. So the catalog thumbnail can be that picture
+    /// rather than a photograph of it. This was the reason clothing items showed a plain grey
+    /// torso: the renderer was asked to load the clothing through RCC, could not, and the fallback
+    /// rendered an avatar - which is a grey mannequin when the texture never arrives.
+    /// </summary>
+    private async Task<bool> TryUseClothingTexture(long assetId, Dto.Assets.AssetVersionEntry latestVersion)
+    {
+        if (latestVersion.contentId == 0)
+            return false;
+
+        Dto.Assets.AssetVersionEntry textureVersion;
+        try
+        {
+            textureVersion = await GetLatestAssetVersion(latestVersion.contentId);
+        }
+        catch (RecordNotFoundException)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(textureVersion.contentUrl))
+            return false;
+
+        using var content = await GetAssetContent(textureVersion.contentUrl!);
+        var key = await UploadAssetContent(content, Configuration.ThumbnailsDirectory, "png");
+        await InsertOrReplaceThumbnail(assetId, latestVersion.assetVersionId, key,
+            ModerationStatus.AwaitingApproval);
+        return true;
     }
 
     /// <summary>
@@ -631,6 +672,15 @@ public class AssetsService : ServiceBase, IService
     private async Task CreateClothingThumbnailV2(long assetId, Models.Assets.Type assetType, CancellationToken? cancellationToken = null)
     {
         var latestVersion = await GetLatestAssetVersion(assetId);
+        try
+        {
+            if (await TryUseClothingTexture(assetId, latestVersion))
+                return;
+        }
+        catch (Exception e)
+        {
+            Writer.Info(LogGroup.AssetRender, "could not use the clothing texture for asset {0}: {1}", assetId, e.Message);
+        }
         try
         {
             var response = await Rendering.CommandHandler.RequestTextureThumbnail(assetId, (int)assetType, cancellationToken);
