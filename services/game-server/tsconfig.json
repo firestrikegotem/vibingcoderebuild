@@ -16,6 +16,7 @@
         "strictBindCallApply": true,
         "strictFunctionTypes": true,
         "module": "commonjs",
+        "resolveJsonModule": true,
         "moduleResolution": "node",
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,

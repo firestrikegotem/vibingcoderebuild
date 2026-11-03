@@ -8,6 +8,7 @@ import pf = require('portfinder');
 const sleep = util.promisify(setTimeout);
 import os = require('os');
 import conf from '../helpers/Config';
+import { renderFallbackThumbnail, renderFallbackHeadshot } from '../avatarFallback';
 import * as models from '../models';
 import sharp = require('sharp');
 import uuid = require('uuid');
@@ -1277,6 +1278,23 @@ export default class CommandHandler extends StdExceptions {
 	}
 
 	/**
+	 * RCC renders crash often enough on this build that an avatar with no picture is the norm, not
+	 * the exception. Rather than fail the request, draw the avatar from its own body colours so the
+	 * site always has an image. AVATAR_FALLBACK=0 turns this off once RCC is reliable again.
+	 */
+	private async fallbackAvatar(user: models.AvatarRenderRequest, kind: 'thumbnail' | 'headshot', reason: any): Promise<string> {
+		const message = reason && reason.message ? reason.message : String(reason);
+		if (process.env.AVATAR_FALLBACK === '0') {
+			throw reason;
+		}
+		console.log('[warn] RCC did not deliver the ' + kind + ' for user ' + user.userId + ' (' + message + '), drawing it from body colours instead');
+		const size = 420;
+		return kind === 'headshot'
+			? await renderFallbackHeadshot(user, size)
+			: await renderFallbackThumbnail(user, size);
+	}
+
+	/**
 	 * Generate a user avatar headshot
 	 * @param user 
 	 */
@@ -1294,9 +1312,12 @@ export default class CommandHandler extends StdExceptions {
 		// create the job
 		this.addToQueue(jobRequest);
 		// await job
-		const result = await getResult(jobRequest.jobId, resolutionMultiplier.userHeadshot);
-		// return base64 value
-		return result.thumbnail;
+		try {
+			const result = await getResult(jobRequest.jobId, resolutionMultiplier.userHeadshot);
+			return result.thumbnail;
+		} catch (e) {
+			return await this.fallbackAvatar(user, 'headshot', e);
+		}
 	}
 
 	/**
@@ -1317,9 +1338,12 @@ export default class CommandHandler extends StdExceptions {
 		// create the job
 		this.addToQueue(jobRequest);
 		// await job
-		const result = await getResult(jobRequest.jobId, resolutionMultiplier.userThumbnail);
-		// return base64 value
-		return result.thumbnail;
+		try {
+			const result = await getResult(jobRequest.jobId, resolutionMultiplier.userThumbnail);
+			return result.thumbnail;
+		} catch (e) {
+			return await this.fallbackAvatar(user, 'thumbnail', e);
+		}
 	}
 
 	private async ConvertGeneric(mode: string, base64EncodedFile: string): Promise<string> {
