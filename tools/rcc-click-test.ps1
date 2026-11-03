@@ -20,9 +20,14 @@ $lua = @"
 local tg = game:GetService('ThumbnailGenerator')
 tg.GraphicsMode = $GraphicsMode
 print('[test] graphics mode', tg.GraphicsMode)
+-- CFrame.new takes 3 or 12 numbers, never 6; passing 6 made RCC answer
+-- "Invalid number of arguments: 6" before the click was ever reached.
+local block = Instance.new('Part', workspace)
+block.Anchored = true
+block.Position = Vector3.new(0, 5, 0)
 local cam = Instance.new('Camera', workspace)
 cam.CameraType = Enum.CameraType.Scriptable
-cam.CoordinateFrame = CFrame.new(0, 10, 20, 0, 0, 0)
+cam.CoordinateFrame = CFrame.new(Vector3.new(0, 10, 20), Vector3.new(0, 5, 0))
 workspace.CurrentCamera = cam
 local ok, res = pcall(function() return tg:Click('png', 420, 420, true, true) end)
 print('[test] click ok', ok, 'type', type(res), 'len', tostring(res) and #tostring(res) or 0)
