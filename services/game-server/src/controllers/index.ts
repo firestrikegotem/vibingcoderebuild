@@ -65,7 +65,10 @@ const RCC_PORT_MAX = 53650;
 const getFreeRccPort = async (): Promise<number> => {
 	for (let i = RCC_PORT_MIN; i < RCC_PORT_MAX; i++) {
 		let avail = await isPortAvailable(i);
-		console.log('[info] port available?',i,avail);
+		// Scanning every port prints dozens of identical lines per render; only the outcome matters.
+		if (avail) {
+			console.log('[info] free RCC port:', i);
+		}
 		if (avail) {
 			return i;
 		}
@@ -162,18 +165,27 @@ const logRccCrashContext = (port: number): void => {
  * instead of a pipe, so this is the only view of what a running job is doing - and the only
  * way to tell "the script errored on line 3" from "the script is still clicking".
  */
-const logRccTail = (port: number, label: string, lines = 30): void => {
+const isRccLogNoise = (line: string): boolean => {
+	const t = line.trim();
+	return t === ''
+		|| t.startsWith('rl>http')
+		|| t.startsWith('httpGet  failed')
+		|| t.startsWith('.  Elapsed time')
+		|| t.includes('Trust check failed')
+		// CoreGui in the RCC content folder is a different version to this binary, so it throws
+		// a few dozen stack traces on every start. They bury the job's own output.
+		|| t.includes('CoreGui')
+		|| t.includes('RobloxGui')
+		|| t.includes('Stack End')
+		|| t.includes('Requested module experienced an error')
+		|| t.includes('UserGameSettings');
+};
+
+const logRccTail = (port: number, label: string, lines = 60): void => {
 	try {
 		const logPath = rccLogPath(port);
 		if (!fs.existsSync(logPath)) return;
-		const noisy = (line: string): boolean => {
-			const t = line.trim();
-			return t === ''
-				|| t.startsWith('rl>http')
-				|| t.startsWith('httpGet  failed')
-				|| t.startsWith('.  Elapsed time')
-				|| t.includes('Trust check failed');
-		};
+		const noisy = isRccLogNoise;
 		const tail = fs.readFileSync(logPath, 'utf8').split(/\r?\n/).filter(l => !noisy(l)).slice(-lines);
 		if (tail.length === 0) return;
 		console.log('[rcc:' + label + '] tail of', path.basename(logPath) + ':');
@@ -270,6 +282,9 @@ export default class CommandHandler extends StdExceptions {
 		games: [],
 	}
 	private reservedPorts: number[] = [];
+	// Several renders requested at once each asked for an RCC before the first one existed, so
+	// three processes were started and the later ones waited on the reserved port for ever.
+	private _startingRcc?: Promise<any>;
 	
 	constructor() {
 		super();
@@ -990,6 +1005,11 @@ export default class CommandHandler extends StdExceptions {
 	}
 
 	private async GetRccForRender(): Promise<IGameEntry> {
+		// A start already in flight will hand back a usable RCC for everybody waiting.
+		if (this._startingRcc) {
+			console.log('[info] an RCC is already starting, waiting for that one');
+			return await this._startingRcc;
+		}
 		let applicable = this.RenderRcc.filter(v => !v.rccClosed && v.rccReference).sort((a,b) => {
 			return a.runningGames > b.runningGames ? 1 : a.runningGames === b.runningGames ? (
 				a.renderCount > b.renderCount ? 1 : a.renderCount === b.renderCount ? 0 : -1
@@ -1043,6 +1063,15 @@ export default class CommandHandler extends StdExceptions {
 			return adopted;
 		}
 		console.log('[info] no applicable RCC instances for render, will create one');
+		this._startingRcc = this.startRccForRender();
+		try {
+			return await this._startingRcc;
+		} finally {
+			this._startingRcc = undefined;
+		}
+	}
+
+	private async startRccForRender(): Promise<IGameEntry> {
 		const id = this.randomId();
 		const port = 0;
 
@@ -1116,7 +1145,19 @@ export default class CommandHandler extends StdExceptions {
 		}).then((resp) => {
 			// The reply is either the job's script result or a SOAP fault explaining the failure.
 			const body = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
-			console.log('[info] rcc replied to job', job.jobId, '-', body.replace(/\s+/g, ' ').slice(0, 400));
+			try {
+				fs.writeFileSync(path.join(__dirname, '../../rcc-job-' + job.jobId + '.xml'), body);
+			} catch (e) { /* diagnostics only */ }
+			const fault = /<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i.exec(body);
+			const result = /<(?:ns\d*:)?(?:OpenJobExResult|BatchJobExResult)[^>]*>([\s\S]*?)<\/(?:ns\d*:)?(?:OpenJobExResult|BatchJobExResult)>/i.exec(body);
+			if (fault) {
+				console.error('[error] RCC fault for job', job.jobId, '-', fault[1].replace(/\s+/g, ' ').trim());
+			} else if (result) {
+				const text = result[1].replace(/\s+/g, ' ').trim();
+				console.log('[info] rcc job result', job.jobId, '-', text.slice(0, 300) || '(empty - the script returned nothing)');
+			} else {
+				console.log('[info] rcc replied to job', job.jobId, '-', body.replace(/\s+/g, ' ').slice(0, 500));
+			}
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		}).catch((e) => {
 			// Expected whenever the process dies instead of replying; the upload decides the
@@ -1124,12 +1165,22 @@ export default class CommandHandler extends StdExceptions {
 			console.log('[info] rcc did not reply to job', job.jobId, '-', e?.message ?? String(e));
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		});
+		// OpenJobEx answers as soon as the job is accepted, so its reply is not the render. While
+		// the script is alive the image can be read back off the job over SOAP, which is the
+		// route that works when this build's outbound HTTP swallows the upload. Race the two:
+		// whichever delivers first wins, and the scripts hold the job open for a minute to give
+		// both a chance.
+		const poller = this.pollJobRenderResult(rcc.rccReference.port, job.jobId);
 		try {
 			await awaitResult(job.jobId);
-			// The upload is in, and the job will never return on its own, so recycle the RCC.
-			console.log('[info] got the render for job', job.jobId, '- closing its RCC');
+			console.log('[info] got the render for job', job.jobId, '- recycling its RCC');
 			await this.requestRccThumbnailerClose(rcc);
+		} catch (e) {
+			console.error('[error] no render arrived for job', job.jobId, '-', (e as Error)?.message ?? String(e));
+			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
+			throw e;
 		} finally {
+			poller.cancel();
 			void request;
 		}
 	}

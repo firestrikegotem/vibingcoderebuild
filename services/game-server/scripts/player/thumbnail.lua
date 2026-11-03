@@ -253,7 +253,7 @@ end
                 ['thumbnail'] = avatarEncoded,
                 ['userId'] = userId,
                 ['accessKey'] = "AccessKey",
-                ['type'] = "PlayerHeadshot",
+                ['type'] = "PlayerThumbnail",
                 ['jobId'] = jobId,
         })
         -- Park the finished image on the job as well. Some RCC builds refuse every
