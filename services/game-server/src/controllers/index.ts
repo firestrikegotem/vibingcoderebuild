@@ -105,13 +105,17 @@ if (conf.baseUrl && !/:\d+(\/|$)/.test(conf.baseUrl)) {
 	console.warn('[warn] config.json baseUrl "' + conf.baseUrl + '" has no port. RCC will fetch assets on port 80 and fail - set it to http://bbblox.org:5000');
 }
 
+/**
+ * One pass, one regex: chained replace() calls reprocessed their own output, which is how
+ * "http://bbblox.org:5000" became "http://bbblox.org:5000:5000". The optional port keeps a
+ * host that already carries one from collecting a second.
+ */
+const backendHostPattern = /https?:\/\/(?:(?:www\.)?(?:economy-simulator\.org|bbblox\.org|bloxyn\.net)|localhost:5000)(?::\d+)?/g;
+
 const localizeScriptUrls = (script: string): string => {
 	const base = rccSafeBaseUrl();
 	return script
-		.replace(/https?:\/\/(www\.)?economy-simulator\.org/g, base)
-		.replace(/https?:\/\/(www\.)?bbblox\.org/g, base)
-		.replace(/https?:\/\/(www\.)?bloxyn\.net/g, base)
-		.replace(/https?:\/\/localhost:5000/g, base)
+		.replace(backendHostPattern, base)
 		// any leftover bare "localhost" (no explicit port), e.g. http://localhost/asset/
 		.replace(/https?:\/\/localhost(?![.\w])/g, 'http://127.0.0.1');
 };
