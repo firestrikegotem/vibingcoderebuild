@@ -144,6 +144,9 @@ const connect = (options) => new Promise((resolve, reject) => {
 		}
 	});
 
+	socket.on('close', () => reject(new Error(
+		'the game server accepted the connection and then closed it, which is what it does when the key ' +
+		'does not match. The tool read "' + options.key + '" from services\\game-server\\config.json')));
 	socket.on('error', (e) => reject(new Error('could not reach the game server on port ' + options.port + ' (' + e.message + '). Is it running?')));
 });
 
@@ -266,6 +269,8 @@ const main = async () => {
 				continue;
 			}
 
+			const label = '#' + row.id + '  ' + row.name;
+			console.log(label + '  rendering...');
 			const texture = await checkTextureUrl(server.baseUrl, version.content_id);
 			const textureNote = texture.error
 				? 'the website never answered ' + texture.url + ' (' + texture.error + ')'
@@ -276,7 +281,7 @@ const main = async () => {
 						: 'the website answered ' + texture.status + ' with ' + texture.bytes + ' bytes that are not a picture (' + texture.url + ')';
 			if (textureNote !== null) {
 				skipped++;
-				console.log('#' + row.id + '  ' + row.name + '  -- ' + textureNote);
+				console.log(label + '  -- ' + textureNote);
 				continue;
 			}
 
@@ -286,13 +291,13 @@ const main = async () => {
 				png = decodePng(data);
 			} catch (e) {
 				skipped++;
-				console.log('#' + row.id + '  ' + row.name + '  -- render failed: ' + e.message);
+				console.log(label + '  -- render failed: ' + e.message);
 				continue;
 			}
 
 			if (png.length < 1000 || png.slice(1, 4).toString() !== 'PNG') {
 				skipped++;
-				console.log('#' + row.id + '  ' + row.name + '  -- renderer sent back something that is not a picture (' + png.length + ' bytes)');
+				console.log(label + '  -- renderer sent back something that is not a picture (' + png.length + ' bytes)');
 				continue;
 			}
 
@@ -308,10 +313,10 @@ const main = async () => {
 				fs.mkdirSync(outputDir, { recursive: true });
 				const file = path.join(outputDir, 'clothing-' + row.id + '.png');
 				fs.writeFileSync(file, png);
-				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes, ' +
+				console.log(label + '  -- ' + png.length + ' bytes, ' +
 					(coverage === null ? '' : coverage + '% coloured, ') + 'saved to ' + path.relative(repoRoot, file) + verdict);
 			} else {
-				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes' +
+				console.log(label + '  -- ' + png.length + ' bytes' +
 					(coverage === null ? '' : ', ' + coverage + '% coloured') + verdict);
 			}
 
