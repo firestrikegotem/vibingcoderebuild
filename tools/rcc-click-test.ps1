@@ -56,6 +56,21 @@ try {
     Write-Host "[test] reply:"
     Write-Host $r.Content
 } catch {
-    Write-Host "[test] request failed: $($_.Exception.Message)"
-    Write-Host "[test] if this is a connection error, RCC died during the click (process crash), not a Lua error."
+    $resp = $_.Exception.Response
+    if ($resp -ne $null) {
+        # A 500 is a SOAP fault, which means RCC is alive and the Lua ran: the body holds the
+        # real error and the RCC console prints it too.
+        Write-Host "[test] status $([int]$resp.StatusCode) - reading fault body"
+        try {
+            $stream = $resp.GetResponseStream()
+            $reader = New-Object System.IO.StreamReader($stream)
+            Write-Host "[test] fault body:"
+            Write-Host $reader.ReadToEnd()
+        } catch {
+            Write-Host "[test] could not read fault body: $($_.Exception.Message)"
+        }
+    } else {
+        Write-Host "[test] request failed: $($_.Exception.Message)"
+        Write-Host "[test] if this is a connection error, RCC died during the click (process crash), not a Lua error."
+    }
 }
