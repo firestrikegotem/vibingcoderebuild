@@ -121,6 +121,12 @@ end
                 item.Graphic = url
             end
             item.Parent = Player.Character
+            -- Setting the template only starts the download. Wait for it, otherwise the snapshot is
+            -- taken of a character whose clothes have not arrived yet.
+            pcall(function()
+                game:GetService("ContentProvider"):PreloadAsync({ item })
+            end)
+            wait(1)
         end
 
         for _, asset in pairs(av.assets) do

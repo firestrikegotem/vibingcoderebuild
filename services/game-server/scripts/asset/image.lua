@@ -152,6 +152,11 @@ local function dressFromTexture(dummy)
 
     if item ~= nil then
         item.Parent = dummy
+        -- The template is a url to fetch, so give the download time to finish before the snapshot.
+        pcall(function()
+            game:GetService("ContentProvider"):PreloadAsync({ item })
+        end)
+        wait(1)
         print("[debug] dressed dummy in", item.ClassName, "from texture", textureId)
     end
 
