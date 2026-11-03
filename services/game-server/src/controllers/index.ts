@@ -77,7 +77,7 @@ import getScripts from '../scripts';
 const scripts = getScripts();
 
 import axiosStatic from 'axios';
-import { awaitResult, doesCallbackExist, getUploadCallbacks, getResult, resolutionMultiplier } from '../rendering';
+import { awaitResult, doesCallbackExist, getUploadCallbacks, getResult, resolutionMultiplier, failJob } from '../rendering';
 import { addMessage } from '../discord';
 const axiosClient = axiosStatic.create({
 	headers: {
@@ -1152,11 +1152,18 @@ export default class CommandHandler extends StdExceptions {
 					if (e && e.isAxiosError && !e.response) {
 						await this.requestRccThumbnailerClose(rcc);
 					}
-					// runJobQueueTask removes us from job queue, so re-add and try again.
-					// if the jobId is removed from RunningJobIds, it means that either the
-					// render was cancelled or the render was finished before erroring.
+					// runJobQueueTask removes us from job queue, so re-add and try again - but only
+					// a couple of times. An RCC that dies on every attempt used to be retried for
+					// ever here, spawning a new process each round and never letting the render fail.
+					const attempts = (item as any).__attempts = ((item as any).__attempts ?? 0) + 1;
 					if (this.RunningJobIds.includes(item.jobId)) {
-						this.JobQueue = [item, ...this.JobQueue];
+						if (attempts >= 3) {
+							console.error('[error] [jq] giving up on', item.jobId, 'after', attempts, 'attempts');
+							failJob(item.jobId, 'render failed after ' + attempts + ' attempts: ' + ((e as Error)?.message ?? String(e)));
+						} else {
+							console.log('[info] [jq] retrying', item.jobId, 'attempt', attempts + 1, 'of 3');
+							this.JobQueue = [item, ...this.JobQueue];
+						}
 						this.RunningJobIds = this.RunningJobIds.filter(v => v !== item.jobId);
 					}
 					console.error('[error] [jq]', item.jobId, e);

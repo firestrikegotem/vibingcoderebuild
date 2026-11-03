@@ -19,6 +19,16 @@ export const resolutionMultiplier = {
 };
 
 let uploadCallbacks: Record<string, Array<(args: any) => void>> = {};
+// Set when a job can no longer produce anything, so the caller falls back at once instead of
+// waiting out the two minute timeout on a render that already died.
+const jobFailures: Record<string, (reason: string) => void> = {};
+export const failJob = (key: string, reason: string): void => {
+	const reject = jobFailures[key];
+	if (reject) {
+		delete jobFailures[key];
+		reject(reason);
+	}
+};
 export const doesCallbackExist = (id: string): boolean => {
 	return uploadCallbacks[id] !== undefined;
 }
@@ -46,15 +56,22 @@ export const awaitResult = (key: string): Promise<void> => {
 let shutdownTimer: any;
 export const getResult = (key: string, upscaleAmount: number): Promise<any> => {
 	return new Promise((res, rej) => {
+		jobFailures[key] = (reason: string) => {
+			clearTimeout(interval);
+			delete uploadCallbacks[key];
+			rej(reason);
+		};
 		let interval = setTimeout(() => {
 			rej('Timeout');
 			delete uploadCallbacks[key];
+			delete jobFailures[key];
 		}, 2 * 60 * 1000);
 		if (!uploadCallbacks[key]) {
 			uploadCallbacks[key] = [];
 		}
 		uploadCallbacks[key].push(async (data) => {
 			clearTimeout(interval);
+			delete jobFailures[key];
 			if (typeof data.thumbnail === 'string') {
 				if (!shutdownTimer) {
 					console.log('[info] creating shutdown timer');
