@@ -1075,8 +1075,11 @@ export default class CommandHandler extends StdExceptions {
 			console.error('[error] RCC reference is not available - it was probably closed, skipping job', job.jobId);
 			return;
 		}
-		// send request
-		const result = await axiosClient.request({
+		// Do NOT await the SOAP reply. The reply only arrives when the script returns, and the
+		// job ending is exactly what crashes this RCC build - waiting for it meant waiting out
+		// a two minute timeout on every render. The image comes back through the upload, so
+		// fire the request and watch for that instead.
+		const request = axiosClient.request({
 			method: 'POST',
 			url: 'http://127.0.0.1:' + rcc.rccReference.port + '/',
 			headers: {
@@ -1084,18 +1087,23 @@ export default class CommandHandler extends StdExceptions {
 			},
 			data: job.request,
 			timeout: 2 * 60 * 1000,
+		}).then(() => {
+			console.log('[info] rcc replied to job', job.jobId);
+		}).catch((e) => {
+			// Expected whenever the process dies instead of replying; the upload decides the
+			// outcome, so this is only logged.
+			console.log('[info] rcc did not reply to job', job.jobId, '-', e?.message ?? String(e));
 		});
-		// Collect the render over SOAP as well as waiting for the upload: builds whose TrustCheck
-		// refuses outbound HTTP leave the script blocked on its own post forever.
-		const poller = this.pollJobRenderResult(rcc.rccReference.port, job.jobId);
-		// wait until over
 		try {
 			await awaitResult(job.jobId);
+			// The upload is in, and the job will never return on its own, so recycle the RCC.
+			console.log('[info] got the render for job', job.jobId, '- closing its RCC');
+			await this.requestRccThumbnailerClose(rcc);
 		} finally {
-			poller.cancel();
+			void request;
 		}
 	}
-	
+
 	private async requestRccThumbnailerClose(rcc: IGameEntry) {
 		if (rcc.rccReference && !rcc.rccClosed) {
 			rcc.rccReference.close();

@@ -274,8 +274,9 @@ end
         end)
         print("[debug] post over", ok, data)
         -- The job ending is what kills this RCC process, and an unfinished request dies with
-        -- it. Hold the job open briefly so the upload has time to leave the process.
-        for _ = 1, 8 do wait(0.5) end
+        -- it. Hold the job open long enough for the game server to collect the upload; it
+        -- recycles the RCC as soon as the image is in.
+        for _ = 1, 120 do wait(0.5) end
     end
 
     local ok, data = pcall(function()
