@@ -274,7 +274,10 @@ interface IExecutorStatus {
 // scripts clicking it at once (which is what half the cores gives you) fight over the same
 // camera and graphics context. Serving three renders in parallel only ever produced a crash
 // partway through one of them.
-const maxJobQueueRunningCount = 1;
+// One job per RCC by default. RCC only has a single graphics context, so scripts clicking at
+// once fight over the same camera, and three at a time was reliably a crash. Override with
+// RENDER_CONCURRENCY=2 if you want to try serving a headshot and a thumbnail at once.
+const maxJobQueueRunningCount = Math.max(1, Number(process.env.RENDER_CONCURRENCY) || 1);
 console.log('[info] render concurrency', maxJobQueueRunningCount, '(one job per RCC)');
 
 const truncateForDiscordMessage = (msg: string) => {

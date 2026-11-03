@@ -567,8 +567,10 @@ public class AvatarService : ServiceBase, IService
         }
 
         // We have to call render library now.
-        // Set image urls to null:
-        await UpdateUserAvatarImages(userId, null, null);
+        // Deliberately NOT clearing the existing urls first. Nulling them is what turned every
+        // avatar edit into a blank placeholder: the page had nothing to show for the ten or so
+        // seconds a render takes, and a failed render left it blank for good. The old image stays
+        // up until the new one is actually on disk.
         // Create request
         var extendedAssetDetails = await assets.MultiGetInfoById(assetIds);
         var request = new Roblox.Rendering.AvatarData()
@@ -597,11 +599,23 @@ public class AvatarService : ServiceBase, IService
         using var cancellation = new CancellationTokenSource();
         cancellation.CancelAfter(TimeSpan.FromSeconds(30));
         // Make both requests at once
-        var result = await Task.WhenAll(new List<Task<Stream>>()
+        Stream[] result;
+        try
         {
-            CommandHandler.RequestPlayerHeadshot(request, cancellation.Token),
-            CommandHandler.RequestPlayerThumbnail(request, cancellation.Token),
-        });
+            result = await Task.WhenAll(new List<Task<Stream>>()
+            {
+                CommandHandler.RequestPlayerHeadshot(request, cancellation.Token),
+                CommandHandler.RequestPlayerThumbnail(request, cancellation.Token),
+            });
+        }
+        catch (Exception e)
+        {
+            // Rendering is the unreliable part of this stack. A failure must leave the previous
+            // avatar in place rather than blanking the user's profile.
+            Roblox.Logging.Writer.Info(Roblox.Logging.LogGroup.FixBrokenThumbnails,
+                "Could not render avatar for userId={0}, keeping the previous image: {1}", userId, e.Message);
+            return;
+        }
         var headshotStream = result[0];
         var thumbnailStream = result[1];
         
