@@ -1,11 +1,21 @@
 import sharp = require("sharp");
 
-// Poor man's anti-aliasing
+// Poor man's anti-aliasing. These multiply the 420px base size the scripts render at.
+// RCC's software renderer (GraphicsMode 3, Mesa llvmpipe) returns a real PNG at 420 but
+// exits with code 1 at 1680, so avatar renders default to the size that is proven to work
+// and can be raised again per renderer without touching code:
+//   RENDER_MULT_USER_THUMBNAIL=2 npm run start
+const multiplier = (envName: string, fallback: number): number => {
+	const raw = process.env[envName];
+	const parsed = raw === undefined ? Number.NaN : Number(raw);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 export const resolutionMultiplier = {
-	game: 4,
-	asset: 1,
-	userThumbnail: 4,
-	userHeadshot: 4,
+	game: multiplier('RENDER_MULT_GAME', 4),
+	asset: multiplier('RENDER_MULT_ASSET', 1),
+	userThumbnail: multiplier('RENDER_MULT_USER_THUMBNAIL', 1),
+	userHeadshot: multiplier('RENDER_MULT_USER_HEADSHOT', 1),
 };
 
 let uploadCallbacks: Record<string, Array<(args: any) => void>> = {};
