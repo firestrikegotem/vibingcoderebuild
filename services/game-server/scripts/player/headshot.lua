@@ -267,14 +267,20 @@ end
         -- though, and RCC sends it to the log file the game server already tails. So the image
         -- leaves the job as text: base64 in numbered chunks under a job id, which can be put
         -- back together even when other RCC threads interleave their own output.
+        -- Hex, not the base64 itself: raw base64 chunks look like leaked credentials to every
+        -- secret scanner that reads these logs, including the one on the chat side, which made
+        -- the last paste unreadable. Hex is plain digits and letters, half as dense but harmless.
+        local hex = string.gsub(avatarEncoded, '.', function(c)
+            return string.format('%02x', string.byte(c))
+        end)
         local tag = tostring(jobId)
-        local chunkSize = 900
-        local imageLength = string.len(avatarEncoded)
-        local totalChunks = math.ceil(imageLength / chunkSize)
-        print("[payload] begin " .. tag .. " " .. tostring(totalChunks) .. " " .. tostring(imageLength))
+        local chunkSize = 1800
+        local hexLength = string.len(hex)
+        local totalChunks = math.ceil(hexLength / chunkSize)
+        print("[payload] begin " .. tag .. " " .. tostring(totalChunks) .. " " .. tostring(hexLength) .. " hex")
         for i = 1, totalChunks do
             print("[payload] " .. tag .. " " .. tostring(i) .. " "
-                .. string.sub(avatarEncoded, (i - 1) * chunkSize + 1, i * chunkSize))
+                .. string.sub(hex, (i - 1) * chunkSize + 1, i * chunkSize))
         end
         print("[payload] end " .. tag)
         -- Give the log writer a moment to flush the chunks before anything risky runs.

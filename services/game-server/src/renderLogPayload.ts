@@ -15,6 +15,7 @@ export class RenderLogPayload {
 	private expected = 0;
 	private declaredLength = 0;
 	private finished = false;
+	private encoding: 'base64' | 'hex' = 'base64';
 
 	public constructor(private readonly jobId: string) {}
 
@@ -37,11 +38,12 @@ export class RenderLogPayload {
 
 	private absorb(line: string): void {
 		if (!line.startsWith('[payload]')) return;
-		const begin = /^\[payload\] begin (\S+) (\d+) (\d+)/.exec(line);
+		const begin = /^\[payload\] begin (\S+) (\d+) (\d+)(?: (\w+))?/.exec(line);
 		if (begin) {
 			if (begin[1] !== this.jobId) return;
 			this.expected = parseInt(begin[2], 10);
 			this.declaredLength = parseInt(begin[3], 10);
+			if (begin[4] === 'hex' || begin[4] === 'base64') this.encoding = begin[4];
 			return;
 		}
 		const piece = /^\[payload\] (\S+) (\d+) (.*)$/.exec(line);
@@ -65,8 +67,25 @@ export class RenderLogPayload {
 		return image;
 	}
 
+	/** How the image was written: hex since the log scanners choke on raw base64. */
+	public get format(): 'base64' | 'hex' {
+		return this.encoding;
+	}
+
 	/** True once a complete image has been handed back. */
 	public get done(): boolean {
 		return this.finished;
+	}
+
+	/** How much of the payload has arrived, for logging when a job dies mid-render. */
+	public get state(): string {
+		if (this.expected === 0) {
+			return 'nothing arrived (no begin line)';
+		}
+		let highest = 0;
+		for (const index of this.chunks.keys()) {
+			if (index > highest) highest = index;
+		}
+		return this.chunks.size + '/' + this.expected + ' chunks, highest index ' + highest;
 	}
 }

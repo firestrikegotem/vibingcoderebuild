@@ -9,7 +9,7 @@ const sleep = util.promisify(setTimeout);
 import os = require('os');
 import conf from '../helpers/Config';
 import { renderFallbackThumbnail, renderFallbackHeadshot } from '../avatarFallback';
-import { RenderLogPayload } from '../renderLogPayload';
+import { watchRenderLog } from '../renderLogWatcher';
 import * as models from '../models';
 import sharp = require('sharp');
 import uuid = require('uuid');
@@ -741,7 +741,7 @@ export default class CommandHandler extends StdExceptions {
 			console.error('[warning] no job id callback for', jobId);
 			return true;
 		}
-		console.log('[info] collected render result over SOAP for job', jobId);
+		console.log('[info] delivered the render for job', jobId);
 		for (const item of callbacks)
 			item(parsed);
 		delete getUploadCallbacks()[jobId];
@@ -792,12 +792,7 @@ export default class CommandHandler extends StdExceptions {
 	 * corrupt the image.
 	 */
 	private watchLogForPayload(port: number, jobId: string): { cancel: () => void } {
-		const logPath = rccLogPath(port);
-		const collector = new RenderLogPayload(jobId);
-		let offset = 0;
-
-		const deliver = (image: string) => {
-			if (collector.done) return;
+		return watchRenderLog(rccLogPath(port), jobId, (image) => {
 			console.log('[info] collected', image.length, 'bytes of render from the RCC log for job', jobId);
 			this.deliverJobResult(jobId, JSON.stringify({
 				thumbnail: image,
@@ -806,36 +801,7 @@ export default class CommandHandler extends StdExceptions {
 				type: 'PlayerHeadshot',
 				jobId,
 			}));
-		};
-
-		const timer = setInterval(() => {
-			if (collector.done) {
-				clearInterval(timer);
-				return;
-			}
-			try {
-				if (!fs.existsSync(logPath)) return;
-				const size = fs.statSync(logPath).size;
-				// RCC truncates the file on some starts; go back to the top if it shrank.
-				if (size < offset) offset = 0;
-				if (size <= offset) return;
-				const length = size - offset;
-				const buffer = Buffer.alloc(length);
-				const fd = fs.openSync(logPath, 'r');
-				try {
-					fs.readSync(fd, buffer, 0, length, offset);
-				} finally {
-					fs.closeSync(fd);
-				}
-				offset = size;
-				const image = collector.feed(buffer.toString('utf8'));
-				if (image) deliver(image);
-			} catch (e) { /* the next tick reads again */ }
-		}, 200);
-
-		return {
-			cancel: () => clearInterval(timer),
-		};
+		});
 	}
 
 	private createShutdownRequest(jobId: string): { request: string; jobId: string; } {
