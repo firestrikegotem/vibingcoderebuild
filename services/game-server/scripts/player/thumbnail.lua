@@ -1,8 +1,12 @@
 local jobId = "InsertJobIdHere";
 local userId = 65789275746246;
 local mode = 'R6'
-local baseURL = "http://economy-simulator.org";
-local uploadURL = "UPLOAD_URL_HERE";
+-- Must match the BaseUrl in RCCService/AppSettings.xml and the hosts entry, or
+-- RCC refuses every request as untrusted.
+local baseURL = "http://bbblox.org";
+-- The website endpoint that accepts the finished image and forwards it to the game
+-- server; posting straight at the game server fails its trust check.
+local uploadURL = baseURL .. "/api/upload-thumbnail-v1";
 
 local function applyMesh(Player, children, limb)
     local ok, msg = pcall(function() 
@@ -258,6 +262,23 @@ end
             .. ',"type":"PlayerThumbnail"'
             .. ',"jobId":"' .. tostring(jobId) .. '"}'
         print("[stage] payload built, bytes", string.len(payload))
+        -- What can this sandbox actually reach? Answers one question with one line: if io exists
+        -- the image can go straight onto disk, which sidesteps both the crashing HTTP call and
+        -- the SOAP read-back.
+        print("[probe] io", type(io), "os", type(os), "writefile", type(writefile), "plugin", type(plugin))
+        local outPath = "OUT_DIR/" .. tostring(jobId) .. ".json"
+        if type(io) == "table" and io.open then
+            local wrote, err = pcall(function()
+                local f = io.open(outPath, "wb")
+                if f == nil then return false end
+                f:write(payload)
+                f:close()
+                return true
+            end)
+            print("[stage] file drop attempted:", wrote, err, outPath)
+        else
+            print("[stage] no io in this sandbox, cannot drop a file")
+        end
         -- Send it straight away. The old crash landed on HttpService:JSONEncode above, never on
         -- this call, so the request was never actually attempted - which is why no upload ever
         -- reached the game server. Two argument form on purpose: the optional content type enum

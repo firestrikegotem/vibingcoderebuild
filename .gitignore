@@ -39,3 +39,5 @@ tmp_place_file.rbxl
 tmp_place_file_out.rbxl
 rcccid-*
 TeeShirtTemplate.png
+# RCC drops finished renders here when it cannot post them
+services/game-server/thumbnail-out/

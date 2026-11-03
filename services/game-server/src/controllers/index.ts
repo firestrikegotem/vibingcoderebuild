@@ -131,6 +131,17 @@ const maxRendersBeforeRestart = 100;
  * output at all), while the very same command line runs fine from a console. Handing it real
  * file handles instead of pipes keeps it alive and leaves a log we can read when a render fails.
  */
+/**
+ * Where a render script can drop its finished payload when it cannot post it: RCC's HTTP call
+ * has never produced an upload on this build, and the process dies a second or two after the
+ * render, so a file on disk is the shortest path out of the sandbox. Lua needs forward slashes.
+ */
+const fileDropDir = path.resolve(__dirname, '../../thumbnail-out');
+try {
+	fs.mkdirSync(fileDropDir, { recursive: true });
+} catch (e) { /* created on demand */ }
+const fileDropDirForLua = fileDropDir.replace(/\\/g, '/');
+
 const rccLogPath = (port: number): string => path.join(__dirname, '../../rcc-' + port + '.log');
 
 /**
@@ -1177,6 +1188,22 @@ export default class CommandHandler extends StdExceptions {
 			console.log('[info] rcc did not reply to job', job.jobId, '-', e?.message ?? String(e));
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 		});
+		// A render that cannot post drops its payload in the shared folder instead. Watch it as
+		// fast as the file system notices: this RCC dies a second or two after the render, so a
+		// three second poll would arrive after the body is already cold.
+		const droppedFile = path.join(fileDropDir, job.jobId + '.json');
+		try { fs.unlinkSync(droppedFile); } catch (e) { /* not there yet */ }
+		const fileWatch = setInterval(() => {
+			try {
+				if (!fs.existsSync(droppedFile)) return;
+				const payload = fs.readFileSync(droppedFile, 'utf8');
+				fs.unlinkSync(droppedFile);
+				if (payload && payload.indexOf('"thumbnail"') !== -1) {
+					console.log('[info] render dropped a file for job', job.jobId);
+					this.deliverJobResult(job.jobId, payload);
+				}
+			} catch (e) { /* the next tick will try again */ }
+		}, 200);
 		// OpenJobEx answers as soon as the job is accepted, so its reply is not the render. While
 		// the script is alive the image can be read back off the job over SOAP, which is the
 		// route that works when this build's outbound HTTP swallows the upload. Race the two:
@@ -1192,6 +1219,7 @@ export default class CommandHandler extends StdExceptions {
 			logRccTail(rcc.rccReference?.port ?? rccPort, job.jobId.slice(0, 8));
 			throw e;
 		} finally {
+			clearInterval(fileWatch);
 			poller.cancel();
 			rccAny.__activeJobs = (rccAny.__activeJobs ?? []).filter((v: string) => v !== job.jobId);
 			void request;
@@ -1417,6 +1445,7 @@ export default class CommandHandler extends StdExceptions {
 				.replace(/JSON_AVATAR/g, JSON.stringify(user).replace(`'`, `\\'`))
 				.replace(/_X_RES_/g, (420 * resolutionMultiplier.userHeadshot).toString())
 				.replace(/_Y_RES_/g, (420 * resolutionMultiplier.userHeadshot).toString())
+				.replace(/OUT_DIR/g, fileDropDirForLua)
 		, uuid.v4());
 		// create the job
 		this.addToQueue(jobRequest);
@@ -1443,6 +1472,7 @@ export default class CommandHandler extends StdExceptions {
 				.replace(/JSON_AVATAR/g, JSON.stringify(user).replace(`'`, `\\'`))
 				.replace(/_X_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
 				.replace(/_Y_RES_/g, (420 * resolutionMultiplier.userThumbnail).toString())
+				.replace(/OUT_DIR/g, fileDropDirForLua)
 		, uuid.v4());
 		this.addToQueue(jobRequest);
 		try {
