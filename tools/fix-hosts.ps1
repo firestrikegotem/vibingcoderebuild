@@ -46,7 +46,26 @@ foreach ($line in $lines) {
 }
 
 $newContent = @($kept) + @('', "127.0.0.1`t$Domain", "127.0.0.1`twww.$Domain")
-Set-Content -Path $hostsPath -Value $newContent -Encoding ASCII -ErrorAction Stop
+
+# Windows marks this file read-only on some machines, and Set-Content then fails with
+# "Stream was not readable". Clear the attribute, write, and put it back afterwards.
+$hostsItem = Get-Item -Path $hostsPath -Force
+$wasReadOnly = ($hostsItem.Attributes -band [System.IO.FileAttributes]::ReadOnly) -ne 0
+if ($wasReadOnly) {
+    $hostsItem.Attributes = $hostsItem.Attributes -band (-bnot [System.IO.FileAttributes]::ReadOnly)
+}
+try {
+    try {
+        Set-Content -Path $hostsPath -Value $newContent -Encoding ASCII -ErrorAction Stop
+    } catch {
+        [System.IO.File]::WriteAllLines($hostsPath, [string[]]$newContent, [System.Text.Encoding]::ASCII)
+    }
+} finally {
+    if ($wasReadOnly) {
+        $after = Get-Item -Path $hostsPath -Force
+        $after.Attributes = $after.Attributes -bor [System.IO.FileAttributes]::ReadOnly
+    }
+}
 
 # WinHTTP caches resolutions separately from the DNS client, so flush it or RCC keeps
 # seeing the old failure until reboot.
