@@ -110,6 +110,16 @@ end
         -- survive - the avatar came back in body colours with nothing on. The avatar data carries
         -- the texture id, so the renderer can dress the character directly.
         local CLOTHING_CLASS = { [2] = "ShirtGraphic", [11] = "Shirt", [12] = "Pants" }
+        -- The 2016 engine looks for clothing on the torso part. Handing the model to it instead is
+        -- only honoured by newer builds, which is a plain torso with nothing on it.
+        local function clothingParent()
+            local character = Player.Character
+            if character == nil then
+                return nil
+            end
+            return character:FindFirstChild("Torso") or character
+        end
+
         local function dressIn(class, textureId)
             local item = Instance.new(class)
             local url = baseURL .. "/asset/?id=" .. tostring(textureId)
@@ -120,7 +130,8 @@ end
             else
                 item.Graphic = url
             end
-            item.Parent = Player.Character
+            item.Parent = clothingParent()
+            print('[debug]', class, 'parented to', tostring(item.Parent), 'via', url)
             -- Setting the template only starts the download. Wait for it, otherwise the snapshot is
             -- taken of a character whose clothes have not arrived yet.
             pcall(function()

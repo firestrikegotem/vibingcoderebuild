@@ -111,23 +111,24 @@ local function findClothing(container)
 end
 
 -- Fallback when LoadAsset fails: build the clothing instance ourselves from the asset URL.
-local function buildClothingFromUrl(dummy)
+local function buildClothingFromUrl(dummy, torso)
     local assetUrl = baseURL .. "/asset/?id=" .. assetId
+    local parent = torso or dummy
 
     if assetType == 11 then
         local shirt = Instance.new("Shirt")
         shirt.ShirtTemplate = assetUrl
-        shirt.Parent = dummy
+        shirt.Parent = parent
         return shirt
     elseif assetType == 12 then
         local pants = Instance.new("Pants")
         pants.PantsTemplate = assetUrl
-        pants.Parent = dummy
+        pants.Parent = parent
         return pants
     elseif assetType == 2 then
         local graphic = Instance.new("ShirtGraphic")
         graphic.Graphic = assetUrl
-        graphic.Parent = dummy
+        graphic.Parent = parent
         return graphic
     end
 
@@ -135,8 +136,10 @@ local function buildClothingFromUrl(dummy)
 end
 
 -- Puts the clothing on the dummy using the picture it is made of.
-local function dressFromTexture(dummy)
+local function dressFromTexture(dummy, torso)
     local url = baseURL .. "/asset/?id=" .. tostring(textureId)
+    -- The 2016 engine looks for clothing on the torso part, not on the model around it.
+    local parent = torso or dummy
     local item = nil
 
     if assetType == 11 then
@@ -151,13 +154,13 @@ local function dressFromTexture(dummy)
     end
 
     if item ~= nil then
-        item.Parent = dummy
+        item.Parent = parent
         -- The template is a url to fetch, so give the download time to finish before the snapshot.
         pcall(function()
             game:GetService("ContentProvider"):PreloadAsync({ item })
         end)
         wait(1)
-        print("[debug] dressed dummy in", item.ClassName, "from texture", textureId)
+        print("[debug] dressed dummy in", item.ClassName, "from texture", textureId, "via", url)
     end
 
     return item
@@ -168,7 +171,7 @@ local function render()
 
     local clothing = nil
     if textureId ~= 0 then
-        clothing = dressFromTexture(dummy)
+        clothing = dressFromTexture(dummy, torso)
     end
 
     if clothing == nil then
@@ -190,7 +193,7 @@ local function render()
             print("[debug] equipped", clothing.ClassName, "from loaded asset")
         else
             print("[warning] no clothing instance in loaded asset, falling back to asset URL")
-            clothing = buildClothingFromUrl(dummy)
+            clothing = buildClothingFromUrl(dummy, torso)
         end
     end
 

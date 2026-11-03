@@ -897,7 +897,8 @@ public class AssetsService : ServiceBase, IService
                 thumbRequests.Add(CreatePackageThumbnail(assetId, cancellationToken));
                 break;
             case Models.Assets.Type.TeeShirt:
-                thumbRequests.Add(CreateTeeShirtThumbnail(assetId, cancellationToken));
+                // Same treatment as the other two: a dummy wearing the shirt, then the picture itself.
+                thumbRequests.Add(CreateClothingThumbnailV2(assetId, Models.Assets.Type.TeeShirt, cancellationToken));
                 break;
             // items without custom icons
             case Models.Assets.Type.Animation:

@@ -43,6 +43,7 @@ if (pg === null) {
 	console.error('Could not find a postgres client. Install one with "npm i pg" and run this again.');
 	process.exit(1);
 }
+const sharp = requireFrom([path.join(gameServerDir, 'node_modules', 'sharp'), 'sharp']);
 const WebSocket = requireFrom([
 	'ws',
 	path.join(gameServerDir, 'node_modules', 'ws'),
@@ -143,6 +144,26 @@ const connect = (options) => new Promise((resolve, reject) => {
 	socket.on('error', (e) => reject(new Error('could not reach the game server on port ' + options.port + ' (' + e.message + '). Is it running?')));
 });
 
+/**
+ * How much of the picture is actually coloured. A dummy that never got its clothes is white plastic
+ * with a face on it, so a share near zero means the item did not make it onto the mannequin.
+ */
+const colourCoverage = async (png) => {
+	if (sharp === null) return null;
+	try {
+		const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+		const stride = info.channels;
+		let colourful = 0;
+		for (let i = 0; i + 2 < data.length; i += stride) {
+			const r = data[i], g = data[i + 1], b = data[i + 2];
+			if (Math.max(r, g, b) - Math.min(r, g, b) > 40) colourful++;
+		}
+		return Math.round((colourful / (info.width * info.height)) * 1000) / 10;
+	} catch (e) {
+		return null;
+	}
+};
+
 /** The renderer hands back base64, sometimes with the data url prefix still attached. */
 const decodePng = (data) => {
 	const text = typeof data === 'string' ? data : (data && data.thumbnail) || '';
@@ -236,13 +257,21 @@ const main = async () => {
 
 			rendered++;
 			const hash = crypto.createHash('sha256').update(png).digest('hex');
+			const coverage = await colourCoverage(png);
+			const verdict = coverage === null
+				? ''
+				: coverage < 1
+					? '  [the mannequin looks undressed - the clothing picture did not arrive]'
+					: '  [the mannequin is wearing it]';
 			if (inspectId !== null) {
 				fs.mkdirSync(outputDir, { recursive: true });
 				const file = path.join(outputDir, 'clothing-' + row.id + '.png');
 				fs.writeFileSync(file, png);
-				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes, saved to ' + path.relative(repoRoot, file));
+				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes, ' +
+					(coverage === null ? '' : coverage + '% coloured, ') + 'saved to ' + path.relative(repoRoot, file) + verdict);
 			} else {
-				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes');
+				console.log('#' + row.id + '  ' + row.name + '  -- ' + png.length + ' bytes' +
+					(coverage === null ? '' : ', ' + coverage + '% coloured') + verdict);
 			}
 
 			if (!apply) continue;
