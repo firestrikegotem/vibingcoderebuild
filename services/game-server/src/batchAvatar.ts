@@ -20,7 +20,7 @@ import conf from './helpers/Config';
 const PNG_PREFIX = 'iVBOR';
 
 /** BatchJob, not OpenJobEx: the reply carries the script's return value. */
-export function buildBatchJobXml(namespace: string, expirationSeconds: number, script: string): string {
+export function buildBatchJobXml(namespace: string, expirationSeconds: number, script: string, includeCategory = false): string {
 	// CDATA cannot carry the sequence "]]>" - guard it so a script can never break the envelope.
 	const safeScript = script.replace(/]]>/g, ']]]]><![CDATA[>');
 	return `<?xml version="1.0" encoding="utf-8"?>
@@ -28,7 +28,7 @@ export function buildBatchJobXml(namespace: string, expirationSeconds: number, s
   <soap:Body>
     <rob:BatchJob>
       <rob:job>
-        <rob:id>${randomJobId()}</rob:id>
+        <rob:id>${randomJobId()}</rob:id>${includeCategory ? '\n        <rob:category>0</rob:category>' : ''}
         <rob:expirationInSeconds>${expirationSeconds}</rob:expirationInSeconds>
         <rob:cores>1</rob:cores>
       </rob:job>
@@ -70,6 +70,11 @@ function namespaceCandidates(): string[] {
 		if (base) {
 			list.push(base + '/');
 			list.push(base);
+			// AppSettings.xml usually carries the origin without the website's port, and RCC
+			// bakes that value in as its SOAP namespace.
+			const origin = base.replace(/:\d+$/, '');
+			list.push(origin + '/');
+			list.push(origin);
 		}
 	} catch (e) {}
 	list.push('http://www.roblox.com/');
@@ -78,36 +83,53 @@ function namespaceCandidates(): string[] {
 
 export async function postBatchJob(port: number, script: string, timeoutSeconds = 120): Promise<{ value: string | null, reply: string }> {
 	let lastReply = '';
-	for (const namespace of namespaceCandidates()) {
-		try {
-			const response = await axios.post(`http://127.0.0.1:${port}/`, buildBatchJobXml(namespace, timeoutSeconds, script), {
-				headers: {
-					'Content-Type': 'text/xml; charset=utf-8',
-					'user-agent': 'GameServer/1.0',
-				},
-				timeout: timeoutSeconds * 1000,
-				responseType: 'text',
-				transformResponse: [(data) => data],
-			});
-			lastReply = typeof response.data === 'string' ? response.data : String(response.data);
-			const value = extractBatchJobValue(lastReply);
-			if (value && value.startsWith(PNG_PREFIX)) {
-				return { value, reply: lastReply };
-			}
-			// A parsed reply without an image means the script ran and failed; retrying with a
-			// different namespace would only repeat it.
-			if (lastReply.includes('BatchJobResult')) {
-				return { value, reply: lastReply };
-			}
-		} catch (e: any) {
-			lastReply = e?.message ?? String(e);
-			if (e?.code === 'ECONNREFUSED' || e?.code === 'ECONNRESET') {
-				// The process is gone; another namespace will not help.
-				return { value: null, reply: lastReply };
+	// Some builds insist on a category on the job and answer 500 without it, so try both
+	// shapes against each candidate namespace. A 500 costs nothing; each returns immediately.
+	for (const includeCategory of [false, true]) {
+		for (const namespace of namespaceCandidates()) {
+			try {
+				const response = await axios.post(`http://127.0.0.1:${port}/`, buildBatchJobXml(namespace, timeoutSeconds, script, includeCategory), {
+					headers: {
+						'Content-Type': 'text/xml; charset=utf-8',
+						'user-agent': 'GameServer/1.0',
+					},
+					timeout: timeoutSeconds * 1000,
+					responseType: 'text',
+					transformResponse: [(data) => data],
+					// Read the body even on a fault: RCC explains itself in the SOAP fault string.
+					validateStatus: () => true,
+				});
+				const reply = typeof response.data === 'string' ? response.data : String(response.data);
+				lastReply = reply;
+				const value = extractBatchJobValue(reply);
+				if (value && value.startsWith(PNG_PREFIX)) {
+					console.log('[info] BatchJob accepted the ' + namespace + ' namespace' + (includeCategory ? ' with a job category' : ''));
+					return { value, reply };
+				}
+				if (reply.includes('BatchJobResult')) {
+					// The script ran; a different namespace would only repeat the same result.
+					return { value, reply };
+				}
+				const fault = extractFault(reply);
+				lastReply = 'HTTP ' + response.status + (fault ? ' - ' + fault : ' - ' + reply.slice(0, 200));
+			} catch (e: any) {
+				lastReply = e?.message ?? String(e);
+				if (e?.code === 'ECONNREFUSED' || e?.code === 'ECONNRESET') {
+					// The process is gone; another namespace will not help.
+					return { value: null, reply: lastReply };
+				}
 			}
 		}
 	}
 	return { value: null, reply: lastReply };
+}
+
+/** SOAP faults carry the useful sentence; log that instead of a wall of XML. */
+export function extractFault(reply: string): string | null {
+	const match = reply.match(/<[^>]*faultstring[^>]*>([\s\S]*?)<\/[^>]*faultstring>/i)
+		|| reply.match(/<[^>]*faultcode[^>]*>([\s\S]*?)<\/[^>]*faultcode>/i);
+	if (!match) return null;
+	return match[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
 }
 
 let officialScript: string | null = null;
