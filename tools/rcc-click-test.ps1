@@ -35,14 +35,23 @@ cam.CameraType = Enum.CameraType.Scriptable
 cam.CoordinateFrame = CFrame.new(Vector3.new(0, 10, 20), Vector3.new(0, 5, 0))
 workspace.CurrentCamera = cam
 
-local ok, res = pcall(function() return tg:Click('png', 420, 420, true, true) end)
-rec('click', ok)
-if ok and type(res) == 'string' then
-    rec('len', #res)
-    rec('head', string.sub(res, 1, 12))
-else
-    rec('err', tostring(res))
+local function attempt(fn)
+    local ok, res = pcall(fn)
+    if ok then
+        if type(res) == 'string' then
+            return 'ok|len=' .. #res .. '|head=' .. string.sub(res, 1, 8)
+        end
+        return 'ok|type=' .. type(res) .. '|val=' .. tostring(res)
+    end
+    return 'err|' .. tostring(res)
 end
+
+-- 'invalid string position' came from inside Click, so this build is rejecting the
+-- argument list before it ever renders. Sweep the plausible signatures in one job.
+rec('a5', attempt(function() return tg:Click('png', 420, 420, true, true) end))
+rec('a4', attempt(function() return tg:Click('png', 420, 420, true) end))
+rec('a3', attempt(function() return tg:Click('png', 420, 420) end))
+rec('a2', attempt(function() return tg:Click('png', 420) end))
 
 return table.concat(out, '|')
 "@
