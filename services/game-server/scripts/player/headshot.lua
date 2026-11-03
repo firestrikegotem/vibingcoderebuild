@@ -248,40 +248,27 @@ end
             print('[warn] headshot render failed, nothing to upload')
             return
         end
-        print("[debug] [player/headshot] send post request containing avatar")
-        local payload = HttpService:JSONEncode({
-                ['thumbnail'] = avatarEncoded,
-                ['userId'] = userId,
-                ['accessKey'] = "AccessKey",
-                ['type'] = "PlayerHeadshot",
-                ['jobId'] = jobId,
-        })
-        -- Park the finished image on the job as well. Some RCC builds refuse every
-        -- outbound HTTP request (TrustCheck), which leaves the render stuck forever at
-        -- the post below. The game server reads this value back over SOAP instead.
-        pcall(function()
-            _G.__bloxynThumbnail = payload
-            local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")
-            if holder == nil then
-                holder = Instance.new("StringValue")
-                holder.Name = "__BloxynThumbnail"
-                holder.Parent = game:GetService("ServerStorage")
-            end
-            holder.Value = payload
-        end)
-        -- PostAsync is what kills this RCC. The log is unambiguous: the click succeeds, the
-        -- script prints "send post request", and the next thing is StartProcessException with
-        -- no "post over" line - so the process dies inside the request, and no pcall can catch
-        -- that. The image is already parked above, so the post is switched off while the game
-        -- server reads it back over SOAP. Flip this on once an RCC whose content matches the
-        -- binary is in place.
-        local TRY_HTTP_POST = false
-        if TRY_HTTP_POST then
-            local ok, data = pcall(function()
-                return HttpService:PostAsync(uploadURL, payload)
-            end)
-            print("[debug] post over", ok, data)
+        -- The process dies within a few lines of the old HttpService:JSONEncode call here, so
+        -- this builds the same JSON with plain string concatenation and prints between every
+        -- step. If RCC still dies, the last stage line printed is the statement that killed it.
+        print("[stage] render ok, bytes", string.len(avatarEncoded))
+        local payload = '{"thumbnail":"' .. avatarEncoded
+            .. '","userId":' .. tostring(userId)
+            .. ',"accessKey":"AccessKey"'
+            .. ',"type":"PlayerHeadshot"'
+            .. ',"jobId":"' .. tostring(jobId) .. '"}'
+        print("[stage] payload built, bytes", string.len(payload))
+        _G.__bloxynThumbnail = payload
+        print("[stage] parked in _G")
+        local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")
+        if holder == nil then
+            holder = Instance.new("StringValue")
+            holder.Name = "__BloxynThumbnail"
+            holder.Parent = game:GetService("ServerStorage")
         end
+        print("[stage] holder ready")
+        holder.Value = payload
+        print("[stage] parked in ServerStorage, holding the job open")
         -- Keep the job alive so the image can be read off it: the poll runs every 3 seconds
         -- and the game server recycles this RCC as soon as it has the payload.
         for _ = 1, 120 do wait(0.5) end

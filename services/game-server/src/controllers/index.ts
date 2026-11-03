@@ -433,6 +433,11 @@ export default class CommandHandler extends StdExceptions {
 		rcc.on('exit', (code) => {
 			this.reservedPorts = this.reservedPorts.filter(v => v !== portToRunOn);
 			console.log('[info] rcc child process exited with code ', code);
+			// Anything still waiting on this process is never going to get an image from it.
+			for (const jobId of ((game as any).__activeJobs ?? [])) {
+				failJob(jobId, 'RCC exited with code ' + code + ' before delivering the render');
+			}
+			(game as any).__activeJobs = [];
 			if (code !== 0 && code !== null) {
 				logRccCrashContext(portToRunOn);
 				const lastedMilliseconds = ((Date.now() - game.createdAt) / 1000).toFixed(2);
@@ -1130,6 +1135,13 @@ export default class CommandHandler extends StdExceptions {
 			console.error('[error] RCC reference is not available - it was probably closed, skipping job', job.jobId);
 			return;
 		}
+		// Remember which jobs this process is serving, so its death can fail them at once
+		// instead of leaving every caller on the two minute timeout.
+		const rccAny = rcc as any;
+		rccAny.__activeJobs = rccAny.__activeJobs ?? [];
+		if (!rccAny.__activeJobs.includes(job.jobId)) {
+			rccAny.__activeJobs.push(job.jobId);
+		}
 		// Do NOT await the SOAP reply. The reply only arrives when the script returns, and the
 		// job ending is exactly what crashes this RCC build - waiting for it meant waiting out
 		// a two minute timeout on every render. The image comes back through the upload, so
@@ -1181,6 +1193,7 @@ export default class CommandHandler extends StdExceptions {
 			throw e;
 		} finally {
 			poller.cancel();
+			rccAny.__activeJobs = (rccAny.__activeJobs ?? []).filter((v: string) => v !== job.jobId);
 			void request;
 		}
 	}
