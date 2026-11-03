@@ -42,15 +42,35 @@ if player.Character then
     end
 end
 
--- The official 2016 script calls Click with five arguments, but this binary also returns
--- "invalid string position" for that form, so accept whichever signature produces a PNG.
--- Click reports failure by returning an error string instead of throwing.
-local function tryClick(args)
+-- The place has no camera of its own, and clicking without a scriptable one is what takes
+-- this process down right after "loaded character". The headshot job builds its own camera
+-- and renders fine, so mirror that here: same parent, same CameraType, framed on the body.
+local character = player.Character
+local head = character and character:FindFirstChild("Head")
+if head == nil then
+    print('[warn] no head on the loaded character, cannot frame the shot')
+    return
+end
+local camera = workspace.CurrentCamera
+if camera == nil then
+    camera = Instance.new("Camera")
+    camera.Parent = character
+end
+camera.Name = "ThumbnailCamera"
+camera.CameraType = Enum.CameraType.Scriptable
+camera.CoordinateFrame = CFrame.new((head.CFrame * CFrame.new(0, 1.2, 11)).p, head.Position)
+camera.FieldOfView = 30
+workspace.CurrentCamera = camera
+print('[debug] thumbnail camera ready, fov', camera.FieldOfView)
+
+-- See the headshot job: the first click after RCC starts never produces an image, so click
+-- once at 1x1 to warm the renderer up before the real one.
+local function tryClick(args, width, height)
     local ok, result = pcall(function()
         if args == 5 then
-            return ThumbnailGenerator:Click(fileExtension, x, y, true, true)
+            return ThumbnailGenerator:Click(fileExtension, width, height, true, true)
         end
-        return ThumbnailGenerator:Click(fileExtension, x, y, true)
+        return ThumbnailGenerator:Click(fileExtension, width, height, true)
     end)
     if ok and type(result) == 'string' and string.sub(result, 1, 5) == 'iVBOR' then
         print('[debug] render ok with', args, 'arguments, bytes', string.len(result))
@@ -60,9 +80,11 @@ local function tryClick(args)
     return nil
 end
 
+pcall(function() ThumbnailGenerator:Click(fileExtension, 1, 1, true) end)
+
 local avatarEncoded = nil
 for attempt = 1, 3 do
-    avatarEncoded = tryClick(4) or tryClick(5)
+    avatarEncoded = tryClick(4, x, y) or tryClick(5, x, y)
     if avatarEncoded ~= nil then break end
     wait(0.5)
 end
