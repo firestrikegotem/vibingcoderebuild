@@ -19,14 +19,18 @@ import conf from './helpers/Config';
 
 const PNG_PREFIX = 'iVBOR';
 
-/** BatchJob, not OpenJobEx: the reply carries the script's return value. */
-export function buildBatchJobXml(namespace: string, expirationSeconds: number, script: string, includeCategory = false): string {
+/**
+ * Both job calls carry the script's return value in the reply; the difference is the year.
+ * 2016 RCC implements BatchJobEx and answers "Method 'rob:BatchJob' not implemented" for
+ * BatchJob, while a 2018+ build is the other way round.
+ */
+export function buildBatchJobXml(namespace: string, expirationSeconds: number, script: string, includeCategory = false, operation = 'BatchJob'): string {
 	// CDATA cannot carry the sequence "]]>" - guard it so a script can never break the envelope.
 	const safeScript = script.replace(/]]>/g, ']]]]><![CDATA[>');
 	return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:rob="${namespace}">
   <soap:Body>
-    <rob:BatchJob>
+    <rob:${operation}>
       <rob:job>
         <rob:id>${randomJobId()}</rob:id>${includeCategory ? '\n        <rob:category>0</rob:category>' : ''}
         <rob:expirationInSeconds>${expirationSeconds}</rob:expirationInSeconds>
@@ -36,7 +40,7 @@ export function buildBatchJobXml(namespace: string, expirationSeconds: number, s
         <rob:name>avatar</rob:name>
         <rob:script><![CDATA[${safeScript}]]></rob:script>
       </rob:script>
-    </rob:BatchJob>
+    </rob:${operation}>
   </soap:Body>
 </soap:Envelope>`;
 }
@@ -81,42 +85,45 @@ function namespaceCandidates(): string[] {
 	return Array.from(new Set(list));
 }
 
-export async function postBatchJob(port: number, script: string, timeoutSeconds = 120): Promise<{ value: string | null, reply: string }> {
+export async function postBatchJob(port: number, script: string, timeoutSeconds = 120, operations: string[] = ['BatchJobEx', 'BatchJob']): Promise<{ value: string | null, reply: string }> {
 	let lastReply = '';
-	// Some builds insist on a category on the job and answer 500 without it, so try both
-	// shapes against each candidate namespace. A 500 costs nothing; each returns immediately.
-	for (const includeCategory of [false, true]) {
-		for (const namespace of namespaceCandidates()) {
-			try {
-				const response = await axios.post(`http://127.0.0.1:${port}/`, buildBatchJobXml(namespace, timeoutSeconds, script, includeCategory), {
-					headers: {
-						'Content-Type': 'text/xml; charset=utf-8',
-						'user-agent': 'GameServer/1.0',
-					},
-					timeout: timeoutSeconds * 1000,
-					responseType: 'text',
-					transformResponse: [(data) => data],
-					// Read the body even on a fault: RCC explains itself in the SOAP fault string.
-					validateStatus: () => true,
-				});
-				const reply = typeof response.data === 'string' ? response.data : String(response.data);
-				lastReply = reply;
-				const value = extractBatchJobValue(reply);
-				if (value && value.startsWith(PNG_PREFIX)) {
-					console.log('[info] BatchJob accepted the ' + namespace + ' namespace' + (includeCategory ? ' with a job category' : ''));
-					return { value, reply };
-				}
-				if (reply.includes('BatchJobResult')) {
-					// The script ran; a different namespace would only repeat the same result.
-					return { value, reply };
-				}
-				const fault = extractFault(reply);
-				lastReply = 'HTTP ' + response.status + (fault ? ' - ' + fault : ' - ' + reply.slice(0, 200));
-			} catch (e: any) {
-				lastReply = e?.message ?? String(e);
-				if (e?.code === 'ECONNREFUSED' || e?.code === 'ECONNRESET') {
-					// The process is gone; another namespace will not help.
-					return { value: null, reply: lastReply };
+	// Each failed attempt is one immediate request, so sweep operations, namespaces and the
+	// category shape rather than guessing which combination this binary wants.
+	for (const operation of operations) {
+		for (const includeCategory of [false, true]) {
+			for (const namespace of namespaceCandidates()) {
+				try {
+					const xml = buildBatchJobXml(namespace, timeoutSeconds, script, includeCategory, operation);
+					const response = await axios.post(`http://127.0.0.1:${port}/`, xml, {
+						headers: {
+							'Content-Type': 'text/xml; charset=utf-8',
+							'user-agent': 'GameServer/1.0',
+						},
+						timeout: timeoutSeconds * 1000,
+						responseType: 'text',
+						transformResponse: [(data) => data],
+						// Read the body even on a fault: RCC explains itself in the SOAP fault string.
+						validateStatus: () => true,
+					});
+					const reply = typeof response.data === 'string' ? response.data : String(response.data);
+					const value = extractBatchJobValue(reply);
+					if (value && value.startsWith(PNG_PREFIX)) {
+						console.log('[info] ' + operation + ' returned an image using the ' + namespace + ' namespace' + (includeCategory ? ' and a job category' : ''));
+						return { value, reply };
+					}
+					if (reply.includes(operation + 'Result')) {
+						// The operation exists and ran; another shape would only repeat it.
+						lastReply = value ?? reply.slice(0, 300);
+						return { value, reply };
+					}
+					const fault = extractFault(reply);
+					lastReply = 'HTTP ' + response.status + ' (' + operation + ', ' + namespace + ') ' + (fault ?? reply.slice(0, 200));
+				} catch (e: any) {
+					lastReply = e?.message ?? String(e);
+					if (e?.code === 'ECONNREFUSED' || e?.code === 'ECONNRESET') {
+						// The process is gone; another shape will not help.
+						return { value: null, reply: lastReply };
+					}
 				}
 			}
 		}
@@ -133,16 +140,57 @@ export function extractFault(reply: string): string | null {
 }
 
 let officialScript: string | null = null;
-function legacyScript(appearanceUrl: string, baseUrl: string, width: number, height: number): string {
+/**
+ * Roblox's own 2016 avatar script, with the placeholders filled in. Its last line returns
+ * ThumbnailGenerator:Click with five arguments, which this binary rejects, so that line is
+ * swapped for a call that tries the four-argument form first. The return value is what the
+ * job hands back, so it is the image itself.
+ */
+export function legacyScript(appearanceUrl: string, baseUrl: string, width: number, height: number): string {
 	if (officialScript == null) {
 		officialScript = fs.readFileSync(path.join(__dirname, '../scripts/player/avatarOfficial2016.lua')).toString();
 	}
-	return officialScript
-		.replace(/%baseUrl%/g, baseUrl)
-		.replace(/%characterAppearanceUrl%/g, appearanceUrl)
-		.replace(/%fileExtension%/g, 'png')
+	// The placeholders sit on the right of a Lua assignment, so the text values have to be
+	// quoted literals, not raw URLs (raw would be a syntax error at the first slash).
+	const quoted = (value: string) => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+	const filled = officialScript
+		.replace(/%baseUrl%/g, quoted(baseUrl))
+		.replace(/%characterAppearanceUrl%/g, quoted(appearanceUrl))
+		.replace(/%fileExtension%/g, quoted('png'))
 		.replace(/%x%/g, String(width))
 		.replace(/%y%/g, String(height));
+
+	const clickCall = 'return game:GetService("ThumbnailGenerator"):Click(fileExtension, x, y, true, true)';
+	if (!filled.includes(clickCall)) {
+		throw new Error('avatarOfficial2016.lua no longer ends with the expected click call');
+	}
+	const wrapper = `local thumbnailGenerator = game:GetService("ThumbnailGenerator")
+-- Software GL: the process dies on the click with the other backends on this machine.
+thumbnailGenerator.GraphicsMode = 3
+print('[debug] graphics mode', thumbnailGenerator.GraphicsMode)
+local function __bloxynClick()
+    -- This binary fails the first click after RCC starts and returns error text instead of
+    -- throwing, so warm it up and check that the result really is PNG data.
+    pcall(function() return thumbnailGenerator:Click(fileExtension, 1, 1, true) end)
+    local forms = {
+        function() return thumbnailGenerator:Click(fileExtension, x, y, true) end,
+        function() return thumbnailGenerator:Click(fileExtension, x, y, true, true) end,
+    }
+    for attempt = 1, 3 do
+        for index, click in ipairs(forms) do
+            local ok, result = pcall(click)
+            if ok and type(result) == 'string' and string.sub(result, 1, 5) == 'iVBOR' then
+                print('[debug] render ok with the ' .. (index == 1 and 'four' or 'five') .. ' argument click, bytes', string.len(result))
+                return result
+            end
+            print('[debug] click form', index, 'returned', ok, tostring(result))
+        end
+        wait(0.5)
+    end
+    return nil
+end
+return __bloxynClick()`;
+	return filled.replace(clickCall, wrapper);
 }
 
 function modernScript(appearanceUrl: string, baseUrl: string, width: number, height: number, rig: string): string {
@@ -172,10 +220,12 @@ export async function renderAvatarOnRcc(port: number, input: AvatarRenderInput):
 	const mode = (process.env.AVATAR_RENDER_MODE ?? 'legacy').toLowerCase();
 	const order = mode === 'modern' ? [modern] : mode === 'both' ? [legacy, modern] : [legacy];
 	const labels = mode === 'modern' ? ['modern'] : mode === 'both' ? ['legacy', 'modern'] : ['legacy'];
+	// BatchJobEx is the operation a 2016 build implements; BatchJob arrived later.
+	const operations = mode === 'modern' ? ['BatchJob'] : ['BatchJobEx', 'BatchJob'];
 
 	for (let i = 0; i < order.length; i++) {
 		console.log('[info] avatar render attempt with the ' + labels[i] + ' job on port ' + port);
-		const { value, reply } = await postBatchJob(port, order[i]());
+		const { value, reply } = await postBatchJob(port, order[i](), 120, operations);
 		if (value && value.startsWith(PNG_PREFIX)) {
 			console.log('[info] ' + labels[i] + ' job returned an image, ' + value.length + ' base64 chars');
 			return value;
