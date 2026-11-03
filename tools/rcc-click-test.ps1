@@ -1,6 +1,10 @@
 # Minimal ThumbnailGenerator test: opens a job on a running RCC and calls Click on an
 # empty place. Nothing from the avatar pipeline is involved, so a failure here means the
-# renderer itself cannot draw on this machine, not that our job script is wrong.
+# renderer itself cannot draw on this machine, not that our avatar job script is wrong.
+#
+# The console window running RCC is the important part: a failing job prints its Lua
+# traceback there. This script just drives the SOAP call with curl.exe, which returns the
+# reply body faithfully (Invoke-WebRequest hands back an empty stream for RCC's 500s).
 #
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File tools\rcc-click-test.ps1
 #         powershell -NoProfile -ExecutionPolicy Bypass -File tools\rcc-click-test.ps1 -Port 53640 -GraphicsMode 3
@@ -48,29 +52,13 @@ $lua
 </soap:Envelope>
 "@
 
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) "rcc-click-$jobId.xml"
+[System.IO.File]::WriteAllText($tmp, $xml, (New-Object System.Text.UTF8Encoding($false)))
+
 $url = "http://127.0.0.1:$Port/"
 Write-Host "[test] posting OpenJobEx to $url (job $jobId, graphics mode $GraphicsMode)"
-try {
-    $r = Invoke-WebRequest -Uri $url -Method POST -ContentType 'text/xml; charset=utf-8' -Body $xml -UseBasicParsing -TimeoutSec 120
-    Write-Host "[test] status $($r.StatusCode)"
-    Write-Host "[test] reply:"
-    Write-Host $r.Content
-} catch {
-    $resp = $_.Exception.Response
-    if ($resp -ne $null) {
-        # A 500 is a SOAP fault, which means RCC is alive and the Lua ran: the body holds the
-        # real error and the RCC console prints it too.
-        Write-Host "[test] status $([int]$resp.StatusCode) - reading fault body"
-        try {
-            $stream = $resp.GetResponseStream()
-            $reader = New-Object System.IO.StreamReader($stream)
-            Write-Host "[test] fault body:"
-            Write-Host $reader.ReadToEnd()
-        } catch {
-            Write-Host "[test] could not read fault body: $($_.Exception.Message)"
-        }
-    } else {
-        Write-Host "[test] request failed: $($_.Exception.Message)"
-        Write-Host "[test] if this is a connection error, RCC died during the click (process crash), not a Lua error."
-    }
-}
+Write-Host "[test] reply body follows. If it is empty, read the RCC console window for the Lua traceback."
+
+& curl.exe -s -S -o - -w "`n[test] http=%{http_code}`n" -H "Content-Type: text/xml; charset=utf-8" --data-binary "@$tmp" $url
+Write-Host "[test] done"
+Remove-Item $tmp -ErrorAction SilentlyContinue
