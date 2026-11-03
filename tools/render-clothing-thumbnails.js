@@ -24,6 +24,8 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const path = require('path');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -97,6 +99,7 @@ const readGameServerConfig = () => {
 	return {
 		port: Number(local.thumbnailWebsocketPort) || 5002,
 		key: local.authorization || settings.GameServerAuthorization || '',
+		baseUrl: (local.baseUrl || 'http://127.0.0.1:5000').replace(/\/$/, ''),
 	};
 };
 
@@ -163,6 +166,30 @@ const colourCoverage = async (png) => {
 		return null;
 	}
 };
+
+/**
+ * Asks the website for the picture the renderer is supposed to draw with, the same way the render
+ * script does. When this comes back empty or as an error page, the clothes cannot appear no matter
+ * what the script does, and it is worth knowing that before blaming the renderer.
+ */
+const checkTextureUrl = (baseUrl, textureId) => new Promise((resolve) => {
+	const url = baseUrl + '/asset/?id=' + textureId;
+	const client = url.startsWith('https:') ? https : http;
+	const request = client.get(url, { timeout: 10000 }, (response) => {
+		const chunks = [];
+		response.on('data', (chunk) => chunks.push(chunk));
+		response.on('end', () => {
+			const body = Buffer.concat(chunks);
+			const isPng = body.length > 8 && body.slice(1, 4).toString() === 'PNG';
+			resolve({ url, status: response.statusCode, bytes: body.length, isPng });
+		});
+	});
+	request.on('timeout', () => {
+		request.destroy();
+		resolve({ url, error: 'no answer within ten seconds' });
+	});
+	request.on('error', (e) => resolve({ url, error: e.message }));
+});
 
 /** The renderer hands back base64, sometimes with the data url prefix still attached. */
 const decodePng = (data) => {
@@ -236,6 +263,20 @@ const main = async () => {
 			if (!locateTexture(dirs.asset, textureKey)) {
 				skipped++;
 				console.log('#' + row.id + '  ' + row.name + '  -- texture is not on disk, nothing to draw');
+				continue;
+			}
+
+			const texture = await checkTextureUrl(server.baseUrl, version.content_id);
+			const textureNote = texture.error
+				? 'the website never answered ' + texture.url + ' (' + texture.error + ')'
+				: texture.status !== 200
+					? 'the website answered ' + texture.status + ' for ' + texture.url
+					: texture.isPng
+						? null
+						: 'the website answered ' + texture.status + ' with ' + texture.bytes + ' bytes that are not a picture (' + texture.url + ')';
+			if (textureNote !== null) {
+				skipped++;
+				console.log('#' + row.id + '  ' + row.name + '  -- ' + textureNote);
 				continue;
 			}
 
