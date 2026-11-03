@@ -32,7 +32,8 @@ function logBuildFingerprint(): void {
 		'full-body camera: ' + (thumbnail.includes('look at the body') ? 'yes' : 'NO'),
 		'job held open: ' + (thumbnail.includes('for _ = 1, 120 do wait(0.5)') ? 'yes' : 'NO'),
 		'headshot held open: ' + (headshot.includes('for _ = 1, 120 do wait(0.5)') ? 'yes' : 'NO'),
-		'http post: ' + (/local TRY_HTTP_POST = true/.test(thumbnail) ? 'on' : 'off (reading back over SOAP)'),
+		'http post: ' + (thumbnail.includes('HttpService:PostAsync(uploadURL, payload)') ? 'on' : 'off'),
+		'stage prints: ' + (thumbnail.includes('[stage] payload built') ? 'yes' : 'NO'),
 	];
 	console.log('[info] render scripts loaded - thumbnail', thumbnail.length, 'bytes, headshot', headshot.length, 'bytes');
 	console.log('[info] ' + markers.join(' | '));

@@ -258,6 +258,16 @@ end
             .. ',"type":"PlayerHeadshot"'
             .. ',"jobId":"' .. tostring(jobId) .. '"}'
         print("[stage] payload built, bytes", string.len(payload))
+        -- Send it straight away. The old crash landed on HttpService:JSONEncode above, never on
+        -- this call, so the request was never actually attempted - which is why no upload ever
+        -- reached the game server. Two argument form on purpose: the optional content type enum
+        -- is one more thing this build can disagree with.
+        local sent = false
+        local postOk, postErr = pcall(function()
+            return HttpService:PostAsync(uploadURL, payload)
+        end)
+        print("[stage] post attempted:", postOk, postErr)
+        sent = postOk and true or false
         _G.__bloxynThumbnail = payload
         print("[stage] parked in _G")
         local holder = game:GetService("ServerStorage"):FindFirstChild("__BloxynThumbnail")
@@ -269,8 +279,9 @@ end
         print("[stage] holder ready")
         holder.Value = payload
         print("[stage] parked in ServerStorage, holding the job open")
-        -- Keep the job alive so the image can be read off it: the poll runs every 3 seconds
-        -- and the game server recycles this RCC as soon as it has the payload.
+        -- Hold the job open: this RCC crashes a second or two after its own CoreGui modules
+        -- start failing, and finishing the script is what lets that tear the process down.
+        -- Waiting keeps the window open for the upload to complete.
         for _ = 1, 120 do wait(0.5) end
     end
 
