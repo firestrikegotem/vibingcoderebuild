@@ -17,22 +17,34 @@ param(
 $jobId = [guid]::NewGuid().ToString()
 
 $lua = @"
+-- Everything this job learns is returned as the job result, because OpenJobEx hands the
+-- return value back over SOAP and RCC console output is not reliably redirectable on Windows.
+local out = {}
+local function rec(k, v) out[#out+1] = k .. '=' .. tostring(v) end
+
 local tg = game:GetService('ThumbnailGenerator')
 tg.GraphicsMode = $GraphicsMode
-print('[test] graphics mode', tg.GraphicsMode)
--- CFrame.new takes 3 or 12 numbers, never 6; passing 6 made RCC answer
--- "Invalid number of arguments: 6" before the click was ever reached.
+rec('mode', tg.GraphicsMode)
+
 local block = Instance.new('Part', workspace)
 block.Anchored = true
 block.Position = Vector3.new(0, 5, 0)
+
 local cam = Instance.new('Camera', workspace)
 cam.CameraType = Enum.CameraType.Scriptable
 cam.CoordinateFrame = CFrame.new(Vector3.new(0, 10, 20), Vector3.new(0, 5, 0))
 workspace.CurrentCamera = cam
+
 local ok, res = pcall(function() return tg:Click('png', 420, 420, true, true) end)
-print('[test] click ok', ok, 'type', type(res), 'len', tostring(res) and #tostring(res) or 0)
-if not ok then print('[test] click error', tostring(res)) end
-return 'click-test-done'
+rec('click', ok)
+if ok and type(res) == 'string' then
+    rec('len', #res)
+    rec('head', string.sub(res, 1, 12))
+else
+    rec('err', tostring(res))
+end
+
+return table.concat(out, '|')
 "@
 
 $xml = @"
